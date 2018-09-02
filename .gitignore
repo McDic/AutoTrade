@@ -1,0 +1,6 @@
+# Pycharm files
+.idea/
+
+# Log, text files
+*.log
+*.txt
