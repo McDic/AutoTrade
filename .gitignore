@@ -4,3 +4,8 @@
 # Log, text files
 *.log
 *.txt
+
+# Critical information
+*.authkey
+*.password
+*.secret
