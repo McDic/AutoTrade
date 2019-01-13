@@ -1,11 +1,21 @@
-# Pycharm files
+# Pycharm related
 .idea/
+
+# Unnecessary python files and testing files
+*.pyc
+*.test.py
+*_test.py
+test/
 
 # Log, text files
 *.log
 *.txt
 
+# Chrome driver
+**/chromedriver.exe
+
 # Critical information
+*.key
 *.authkey
 *.password
 *.secret
