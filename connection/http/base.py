@@ -84,12 +84,3 @@ class AbstractHTTPConnection(connection.base.AbstractConnection):
         elif mode == "PUT":     return self.session.put(targetURL, data = data)
         elif mode == "DELETE":  return self.session.delete(targetURL)
         else:                   raise connection.errors.InvalidArgumentError("Invalid mode(%s) to request" % (mode,))
-
-    def responseHandle(self, req, mode: str):
-        """
-        <method AbstractHTTPConnection.responseHandle>
-        :param req: Request to handle.
-        :param mode: Handling mode, usually equivalent to endpoint.
-        :return: Processed data from response.
-        """
-        raise NotImplementedError("%s is not ready to handle any HTTP responses" % (self.name,))

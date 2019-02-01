@@ -7,14 +7,15 @@
 *_test.py
 test/
 
-# Log, text files
+# Log, text, raw data files
 *.log
 *.txt
+raw_data/
 
 # Chrome driver
 **/chromedriver.exe
 
-# Critical information
+# Secret information
 *.key
 *.authkey
 *.password

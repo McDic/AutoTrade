@@ -23,6 +23,9 @@ class AbstractConnection:
     Abstract base of all connection.
     """
 
+    # ------------------------------------------------------------------------------------------------------------------
+    # Base methods
+
     def __init__(self, connectionName: str = "AbstractConnection", callLimits: dict = None, key: dict = None):
         """
         <method AbstractConnection.__init__>
@@ -49,8 +52,14 @@ class AbstractConnection:
     def __str__(self):
         return "Connection [%s]" % (self.name,)
 
+    def __enter__(self):
+        return self
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         del self.key
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # Call field related
 
     def addCallField(self, callFieldName: str, timeInterval: float, maxWeight: int):
         """
@@ -60,8 +69,6 @@ class AbstractConnection:
         :param timeInterval:    Call history saving time in seconds.
         :param maxWeight:       Max call weight capacity for time interval.
         """
-
-
 
         # Validity checking
         if callFieldName in self.callLimits:
@@ -118,6 +125,9 @@ class AbstractConnection:
         if time.time() - thisCallLimit["time_interval"] > thisCallLimit["oldest_timestamp"]:
             self.refreshCallField(callFieldName)
         return thisCallLimit["current_weight"] + weight <= thisCallLimit["max_weight"]
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # Handle responses
 
     def responseHandle(self, req, mode: str):
         """

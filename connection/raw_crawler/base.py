@@ -1,6 +1,6 @@
 """
 <module AutoTrade.connection.raw_crawler.base>
-Abstract base for all chrome selenium crawler.
+Abstract base of all selenium crawlers.
 """
 # ----------------------------------------------------------------------------------------------------------------------
 # Libraries
@@ -23,6 +23,9 @@ class AbstractCrawler(AbstractConnection):
     Abstract base of all selenium crawlers.
     """
 
+    # ------------------------------------------------------------------------------------------------------------------
+    # Base methods
+
     def __init__(self, connectionName = "Abstract Crawler", chrome_driver_path = "chromedriver", startURL = ""):
         """
         <method AbstractCrawler.__init__>
@@ -36,15 +39,12 @@ class AbstractCrawler(AbstractConnection):
 
         # Optimize Chrome options.
         chromeOptions = webdriver.ChromeOptions()
-        prefs = {'profile.managed_default_content_settings.images': 2}
-        chromeOptions.add_experimental_option("prefs", prefs)
+        # prefs = {'profile.managed_default_content_settings.images': 2}
+        # chromeOptions.add_experimental_option("prefs", prefs)
         self.driver = webdriver.Chrome(executable_path = chrome_driver_path, chrome_options = chromeOptions)
-        self.driver.minimize_window()
+        # self.driver.minimize_window()
         if startURL: self.driver.get(startURL)
         self.driver.implicitly_wait(1)
-
-    def __enter__(self):
-        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         super().__exit__(exc_type, exc_val, exc_tb) # Parent class __exit__

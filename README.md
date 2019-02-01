@@ -1,6 +1,6 @@
 # AutoTrade
 
-Quantitative Analysis for Cryptocurrency Trading.
+Quantitative Analysis Toolkit.
 
 # Pre-requisites
 
@@ -10,7 +10,8 @@ Quantitative Analysis for Cryptocurrency Trading.
     - selenium: Powerful raw crawling
         - beautifulsoup4: HTML parser
     - psycopg2: PostgreSQL Python binder
-    - *(UNUSED) ccxt: Cryptocurrency exchanges binder*
+    - pony: Excellent ORM for database
+    - ccxt: Cryptocurrency exchanges binder
     - *(UNUSED) boto3: AWS SDK for Python 3*
     
 - PostgreSQL 10+
