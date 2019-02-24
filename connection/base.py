@@ -72,7 +72,7 @@ class AbstractConnection:
 
         # Validity checking
         if callFieldName in self.callLimits:
-            raise InvalidArgumentError("Already same callFieldName [%s] exist" % (callFieldName,))
+            raise InvalidError("Already same callFieldName [%s] exist" % (callFieldName,))
         assert type(maxWeight) in (int, float) and maxWeight > 0
         assert type(timeInterval) in (int, float) and timeInterval > 0
 
@@ -140,4 +140,3 @@ class AbstractConnection:
 
 # ----------------------------------------------------------------------------------------------------------------------
 # __all__
-__all__ = ["AbstractConnection"]

@@ -20,3 +20,6 @@ raw_data/
 *.authkey
 *.password
 *.secret
+
+# Usage example
+usage_example/

@@ -83,4 +83,4 @@ class AbstractHTTPConnection(connection.base.AbstractConnection):
         elif mode == "GET":     return self.session.get(targetURL, params = params)
         elif mode == "PUT":     return self.session.put(targetURL, data = data)
         elif mode == "DELETE":  return self.session.delete(targetURL)
-        else:                   raise connection.errors.InvalidArgumentError("Invalid mode(%s) to request" % (mode,))
+        else:                   raise connection.errors.InvalidError("Invalid mode(%s) to request" % (mode,))

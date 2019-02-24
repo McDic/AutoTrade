@@ -1,5 +1,5 @@
 """
-<module AutoTrade.connection.raw_crawler.bitcoincharts>
+<module AutoTrade.connection.raw_crawler.bitcoincharts> (Deprecated)
 Raw crawler at bitcoincharts.com to gather 1 minute interval BTCUSD OHLCV data.
 """
 # ----------------------------------------------------------------------------------------------------------------------

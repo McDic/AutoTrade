@@ -9,28 +9,36 @@
 # ----------------------------------------------------------------------------------------------------------------------
 # Error classes for AbstractConnection
 
-class AbstractConnectionError(ConnectionError):
+class AutoTradeConnectionError(Exception):
     """
-    <class AbstractConnectionError> inherited from ConnectionError
+    <class AutoTradeConnectionError> inherited from Exception
     Abstract base of all connection's error.
     """
 
-class CallLimitExceededError(AbstractConnectionError):
+class CallLimitExceededError(AutoTradeConnectionError):
     """
-    <class CallLimitExceededError> inherited from AbstractConnectionError
+    <class CallLimitExceededError> inherited from AutoTradeConnectionError
     Used when connection's call limit exceeded.
     """
 
     def __init__(self, connectionName: str, fieldName: str):
         super().__init__("Connection [%s] call [%s] weight limit exceeded" % (connectionName, fieldName))
 
-class InvalidArgumentError(AbstractConnectionError):
+class InvalidError(AutoTradeConnectionError):
     """
-    <class InvalidArgumentError> inherited from AbstractConnectionError, ValueError
+    <class InvalidError> inherited from AutoTradeConnectionError, ValueError
     Used when invalid argument or value is passed to connection's method.
     But simple assertions can be raised by AssertionError, not this error.
     """
 
+class MarketNotSupported(AutoTradeConnectionError):
+    """
+    <class MarketNotSupported> inherited from AutoTradeConnectionError
+    Used when given market is not supported.
+    """
+
+    def __init__(self, exchange: str, base: str, quote: str):
+        super().__init__("Market (%s, %s <-> %s) not supported" % (exchange, base, quote))
+
 # ----------------------------------------------------------------------------------------------------------------------
 # __all__
-__all__ = ["AbstractConnectionError", "CallLimitExceededError", "InvalidArgumentError"]
