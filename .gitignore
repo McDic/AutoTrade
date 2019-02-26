@@ -11,6 +11,7 @@ test/
 *.log
 *.txt
 *.csv
+*.config
 raw_data/
 
 # Chrome driver

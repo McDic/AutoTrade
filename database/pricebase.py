@@ -319,9 +319,6 @@ def openFromFile(filepath, markets = None):
 # Testing
 
 if __name__ == "__main__":
-    import json
-    # with open("targetMarkets.json") as marketJson:
-        # additionalMarkets = json.loads(marketJson.read())
     PDB = openFromFile("awsdb.authkey")
 
     # Get data test
