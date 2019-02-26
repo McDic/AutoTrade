@@ -10,6 +10,7 @@ test/
 # Log, text, raw data files
 *.log
 *.txt
+*.csv
 raw_data/
 
 # Chrome driver
