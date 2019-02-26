@@ -120,7 +120,7 @@ class CCXTConnection(AbstractConnection):
     @staticmethod
     def makeDecimal(value):
         if value is None: return decimal.Decimal(0)
-        elif isinstance(value, decimal.Decimal): return value
+        elif isinstance(value, decimal.Decimal): return value.quantize(decimal.Decimal("0.1") ** 8)
         elif isinstance(value, (int, float, str)): return decimal.Decimal(value).quantize(decimal.Decimal("0.1") ** 8)
         else: raise connection.errors.InvalidError("Invalid type(%s) given in CCXTConnection.makeDecimal" % (type(value),))
 
@@ -204,12 +204,18 @@ class CCXTConnection(AbstractConnection):
     # Fetching price and order books
 
     unnecessaryOrderbookTags = ("datetime", "nonce", "timestamp")
-    async def fetchOrderbook(self, exchangeName: str, base: str, quote: str, removeUnnecessaryTags: bool = True):
+    async def fetchOrderbook(self, exchangeName: str, base: str, quote: str,
+                             removeUnnecessaryTags: bool = True, processReversed: bool = False):
         """
         <async method CCXTConnection.fetchOrderbook>
         Fetch orderbook for given exchange name and market.
         :return: Orderbook information, formatted as {}
         """
+
+        # Process if need to support reverse
+        if processReversed and not self.isSupported(exchangeName, base, quote) and self.isSupported(exchangeName, quote, base):
+            reversedResult = await self.fetchOrderbook(exchangeName, quote, base, removeUnnecessaryTags = removeUnnecessaryTags)
+
 
         self.raiseIfNotSupported(exchangeName, base, quote)
         result = await self.exchanges[exchangeName].fetch_order_book("%s/%s" % (quote, base))

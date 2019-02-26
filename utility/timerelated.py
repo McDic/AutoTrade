@@ -29,6 +29,6 @@ class TimeMeasure:
         timeDiff = nowTime - self.lastUpdatedTime
         self.lastUpdatedTime = nowTime
         if printing:
-            print("[DEBUG] ")
+            # print("[DEBUG] ")
             raise NotImplementedError
         return timeDiff
