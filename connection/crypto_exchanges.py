@@ -260,7 +260,7 @@ import time
 if __name__ == "__main__":
 
     ccxtcon = CCXTConnection.makeFromFile(Upbit = "upbit.authkey", Binance = "binance.authkey",
-                                          Bithumb = "bithumb.authkey")
+                                          Bithumb = "bithumb_jo.authkey")
 
     #pprint(ccxtcon.markets["Upbit"])
     #pprint(ccxtcon.markets["Binance"])
