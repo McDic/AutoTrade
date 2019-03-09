@@ -54,7 +54,7 @@ class PriceBase:
 
         # Migrate markets
         self.markets = {}
-        if type(additionalMarkets) is dict:
+        if isinstance(additionalMarkets, dict):
             for exchange in additionalMarkets:
                 self.markets[exchange] = {}
                 for base in additionalMarkets[exchange]:
@@ -73,7 +73,7 @@ class PriceBase:
                 AND table_type = 'BASE TABLE';""")
             for result in cursor:
                 tablename = result[0]
-                if tablename.startswith("PriceData_"): # Syntax should be PRICEDATA_EXCHANGE_BASE_QUOTE_aggregate(minute)
+                if tablename.startswith("PriceData_"): # Syntax should be PRICEDATA_(EXCHANGE)_(BASE)_(QUOTE)_(aggregate)mins
                     _, exchange, base, quote, minuteInterval = [c.strip(" ") for c in tablename.split("_")]
                     minuteInterval = int(minuteInterval.replace("mins", ""))
                     if exchange not in self.markets: self.markets[exchange] = {}

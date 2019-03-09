@@ -40,23 +40,17 @@ class AbstractConnection:
         self.key = {} # {name: value (string)}
 
         # Adding call limits and key
-        if type(callLimits) is dict:
+        if isinstance(callLimits, dict):
             for callFieldName in callLimits:
                 timeInterval, maxWeight = callLimits[callFieldName]
                 self.addCallField(callFieldName, timeInterval, maxWeight)
-        else: assert callLimits is None
+        elif callLimits: raise InvalidError("Given call limits is not valid (type %s)" % (type(callLimits),))
         if type(key) is dict:
             for name in key: self.key[name] = str(key[name])
-        else: assert key is None
+        elif key: raise InvalidError("Given key is not valid (type %s)" % (type(key),))
 
     def __str__(self):
-        return "Connection [%s]" % (self.name,)
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        del self.key
+        return "AbstractConnection [%s]" % (self.name,)
 
     # ------------------------------------------------------------------------------------------------------------------
     # Call field related
@@ -71,15 +65,18 @@ class AbstractConnection:
         """
 
         # Validity checking
-        if callFieldName in self.callLimits:
+        if not callFieldName:
+            raise InvalidError("Empty string or None cannot be call field name('%s' given)" % (callFieldName,))
+        elif callFieldName in self.callLimits:
             raise InvalidError("Already same callFieldName [%s] exist" % (callFieldName,))
-        assert type(maxWeight) in (int, float) and maxWeight > 0
-        assert type(timeInterval) in (int, float) and timeInterval > 0
+        elif not (isinstance(maxWeight, (int, float)) and maxWeight > 0):
+            raise InvalidError("Given maxWeight argument is invalid (type %s, value %s)" % (type(maxWeight), maxWeight))
+        elif not (type(timeInterval) in (int, float) and timeInterval > 0):
+            raise InvalidError("Given timeInterval argument is invalid (type %s, value %s)" % (type(timeInterval), timeInterval))
 
         # Add new call field
         self.callLimits[callFieldName] = {"time_interval": timeInterval, "max_weight": maxWeight,
-                                          "history": queue.PriorityQueue(), "current_weight": 0,
-                                          "oldest_timestamp": -1}
+                                          "history": queue.PriorityQueue(), "current_weight": 0, "oldest_timestamp": -1}
         # time_interval: Refreshing time interval
         # max_weight: Maximum weight able to send in given interval
         # history: PriorityQueue [(timestamp, weight), ...]
@@ -114,7 +111,7 @@ class AbstractConnection:
         """
 
         # If no call field name then always return True
-        if callFieldName is None: return True
+        if not callFieldName: return True
 
         # Validity checking
         assert callFieldName in self.callLimits

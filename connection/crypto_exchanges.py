@@ -10,7 +10,7 @@ The reason why I made this is to avoid IP ban due to exceed the API call limit.
 # Standard libraries
 import asyncio
 import atexit
-import decimal
+from decimal import Decimal
 
 # External libraries
 import ccxt.async_support as ccxt
@@ -52,6 +52,9 @@ class CCXTConnection(AbstractConnection):
         asyncio.get_event_loop().run_until_complete(self.fetchMarkets())
         self.balance = {} # {exchangeName: {currency: {free: __, total: __, }}}
         asyncio.get_event_loop().run_until_complete(self.fetchBalances())
+
+        # Save market by order ID. {(exchangeName, orderID): ()}
+        self.marketByOrderID = {}
 
         # Register termination
         atexit.register(self.terminate)
@@ -115,33 +118,15 @@ class CCXTConnection(AbstractConnection):
         <method CCXTConnection.raiseIfNotSupported>
         raise Exception if given market is not supported.
         """
-        if not self.isSupported(exchange, base, quote): raise connection.errors.MarketNotSupported(exchange, base, quote)
+        if not self.isSupported(exchange, base, quote):
+            raise connection.errors.MarketNotSupported(exchange, base, quote)
 
     @staticmethod
     def makeDecimal(value):
-        if value is None: return decimal.Decimal(0)
-        elif isinstance(value, decimal.Decimal): return value.quantize(decimal.Decimal("0.1") ** 8)
-        elif isinstance(value, (int, float, str)): return decimal.Decimal(value).quantize(decimal.Decimal("0.1") ** 8)
+        if value is None: return Decimal(0)
+        elif isinstance(value, Decimal): return value.quantize(Decimal("0.1") ** 8)
+        elif isinstance(value, (int, float, str)): return Decimal(value).quantize(Decimal("0.1") ** 8)
         else: raise connection.errors.InvalidError("Invalid type(%s) given in CCXTConnection.makeDecimal" % (type(value),))
-
-    # ------------------------------------------------------------------------------------------------------------------
-    # Asyncio control
-
-    @staticmethod
-    def fetchConcurrently(*coros):
-        """
-        <static method CCXTConnection.fetchConcurrently>
-        Fetch request results concurrently. Responses are returned as list of result of each tasks.
-        :param coros: Coroutines. CCXTConnection coroutines are only recommended to put as arguments.
-        :return: Fetched results as list.
-        """
-        async def helper():
-            tasks = []
-            for coro in coros: tasks.append(asyncio.create_task(coro))
-            result = []
-            for task in tasks: result.append(await task)
-            return result
-        return asyncio.get_event_loop().run_until_complete(helper())
 
     # ------------------------------------------------------------------------------------------------------------------
     # Fetching markets
@@ -201,7 +186,21 @@ class CCXTConnection(AbstractConnection):
         for exchangeName in exchangeNames: self.balance[exchangeName] = await self.fetchBalance(exchangeName, True)
 
     # ------------------------------------------------------------------------------------------------------------------
-    # Fetching price and order books
+    # Fetching price and orderbooks
+
+    reversedAsksBids = {"asks": "bids", "bids": "asks"}
+    @staticmethod
+    def reversedOrderbook(orderbook):
+        """
+        <method CCXTConnection.reversedOrderbook>
+        Create and return reversed orderbook.
+        """
+        result = {"asks": {}, "bids": {}, "reversed": not orderbook["reversed"]}
+        for ask_or_bid in ("asks", "bids"):
+            for price in orderbook[ask_or_bid]:
+                amount = orderbook[ask_or_bid][price]
+                result[CCXTConnection.reversedAsksBids[ask_or_bid]][price ** -1] = price * amount
+        return result
 
     unnecessaryOrderbookTags = ("datetime", "nonce", "timestamp")
     async def fetchOrderbook(self, exchangeName: str, base: str, quote: str,
@@ -209,18 +208,20 @@ class CCXTConnection(AbstractConnection):
         """
         <async method CCXTConnection.fetchOrderbook>
         Fetch orderbook for given exchange name and market.
-        :return: Orderbook information, formatted as {}
+        :return: Orderbook information, formatted as
+            {"bids": {price: amount, ..}, "asks": {price: amount, ..}, "reversed": T/F}
         """
 
-        # Process if need to support reverse
+        # Process if need to support reversed orderbook
         if processReversed and not self.isSupported(exchangeName, base, quote) and self.isSupported(exchangeName, quote, base):
-            reversedResult = await self.fetchOrderbook(exchangeName, quote, base, removeUnnecessaryTags = removeUnnecessaryTags)
+            return CCXTConnection.reversedOrderbook(
+                await self.fetchOrderbook(exchangeName, quote, base, removeUnnecessaryTags = removeUnnecessaryTags))
 
-
+        # Main processing
         self.raiseIfNotSupported(exchangeName, base, quote)
         result = await self.exchanges[exchangeName].fetch_order_book("%s/%s" % (quote, base))
         if removeUnnecessaryTags:
-            for untag in CCXTConnection.unnecessaryOrderbookTags: del result[untag]
+            for unnecessaryTag in CCXTConnection.unnecessaryOrderbookTags: del result[unnecessaryTag]
         for ask_or_bid in ("asks", "bids"):
             old_data = result[ask_or_bid]
             result[ask_or_bid] = {}
@@ -228,20 +229,27 @@ class CCXTConnection(AbstractConnection):
                 price = CCXTConnection.makeDecimal(price)
                 amount = CCXTConnection.makeDecimal(amount)
                 result[ask_or_bid][price] = amount
+        result["reversed"] = False
         return result
 
-    async def fetchOrderbooks(self, targets: (list, tuple)):
+    async def fetchOrderbooks(self, targets: (list, tuple), processReversed: bool = False):
         """
         <async method CCXTConnection.fetchOrderbooks>
         Fetch current order books for given (exchange, base, quote) tuples.
         :param targets: [(exchange, base, quote), ...]
+        :param processReversed: If true then try to gather reversed orderbooks if possible.
         """
+
+        # Create tasks
         tasks = {}
         for exchangeName, base, quote in targets:
             if exchangeName not in tasks: tasks[exchangeName] = {}
             if base not in tasks[exchangeName]: tasks[exchangeName][base] = {}
             if quote in tasks[exchangeName][base]: raise connection.errors.InvalidError("Duplicated markets")
-            tasks[exchangeName][base][quote] = asyncio.create_task(self.fetchOrderbook(exchangeName, base, quote))
+            tasks[exchangeName][base][quote] = asyncio.create_task(
+                self.fetchOrderbook(exchangeName, base, quote, processReversed = processReversed))
+
+        # Await tasks
         result = {}
         for exchangeName in tasks:
             if exchangeName not in result: result[exchangeName] = {}
@@ -251,16 +259,72 @@ class CCXTConnection(AbstractConnection):
                     result[exchangeName][base][quote] = await tasks[exchangeName][base][quote]
         return result
 
+    # ------------------------------------------------------------------------------------------------------------------
+    # Order
+
+    async def fetchOpenOrders(self, exchangeName: str, base: str = "", quote: str = "", processReversed: bool = False):
+        """
+        <async method CCXTConnection.fetchOpenOrders>
+        :return: All fetched open orders for given market.
+        """
+        if base and quote:
+            if self.isSupported(exchangeName, base, quote): # Specify given symbol is supported
+                return await self.exchanges[exchangeName].fetchOpenOrders(symbol="%s/%s" % (quote, base))
+            elif self.isSupported(exchangeName, quote, base) and processReversed: # Fetch open orders in reversed market
+                return await self.fetchOpenOrders(exchangeName, quote, base, processReversed = True)
+            else: raise connection.MarketNotSupported(exchangeName, base, quote) # Given market not found
+        else: return await self.exchanges[exchangeName].fetchOpenOrders()
+
+    async def createOrder(self, exchangeName: str, base: str, quote: str,
+                          price: (int, float, Decimal), amount: (int, float, Decimal), buy: bool = True):
+        """
+        <async method CCXTConnection.order>
+        Create order based on given exchange, base, quote.
+        If base and quote are reversed, then automatically reverse it and process all related values(amount, price, etc)
+        Price is described by [1 quote = price base], and the unit of amount is quote.
+        :return: Order ID.
+        """
+
+        # Zero price error
+        if price == 0: raise connection.InvalidError("Cannot create orders with zero price")
+
+        # If given market is not supported then try to find reversed pair
+        if not self.isSupported(exchangeName, base, quote):
+            if self.isSupported(exchangeName, quote, base):
+                return await self.createOrder(exchangeName, quote, base, price ** -1, price*amount, buy = not buy)
+            else: raise connection.MarketNotSupported(exchangeName, base, quote)
+
+        # Create order and return order ID
+        result = await self.exchanges[exchangeName].createOrder(
+            "%s/%s" % (quote, base), "limit", "buy" if buy else "sell", amount, price)
+        orderID = result["id"]
+        self.marketByOrderID[exchangeName, orderID] = (base, quote)
+        return orderID
+
+    async def cancelOrder(self, exchangeName: str, orderID: str, explicitBase: str = None, explicitQuote: str = None):
+        """
+        <method CCXTConnection.cancelOrder>
+        Cancel order with given exchange name and order ID.
+        :return: Exchange response
+        """
+
+        if explicitBase and explicitQuote: # If the pair is explicitly provided then use it
+            return await self.exchanges[exchangeName].cancelOrder(orderID, "%s/%s" % (explicitQuote, explicitBase))
+        elif (exchangeName, orderID) in self.marketByOrderID: # If the pair by orderID is available then use it
+            base, quote = self.marketByOrderID[exchangeName, orderID]
+            return await self.exchanges[exchangeName].cancelOrder(orderID, "%s/%s" % (quote, base))
+        else: # Otherwise just cancel with only orderID
+            return await self.exchanges[exchangeName].cancelOrder(orderID)
+
 # ----------------------------------------------------------------------------------------------------------------------
 # Functionality Testing
 
 from pprint import pprint
-import time
 
 if __name__ == "__main__":
 
-    ccxtcon = CCXTConnection.makeFromFile(Upbit = "upbit.authkey", Binance = "binance.authkey",
-                                          Bithumb = "bithumb_jo.authkey")
+    ccxtcon = CCXTConnection.makeFromFile(
+        Upbit = "upbit.authkey", Binance = "binance.authkey", Bithumb = "bithumb_jo.authkey")
 
     #pprint(ccxtcon.markets["Upbit"])
     #pprint(ccxtcon.markets["Binance"])
@@ -273,10 +337,3 @@ if __name__ == "__main__":
     result1 = asyncio.get_event_loop().run_until_complete(
         ccxtcon.fetchOrderbooks([("Upbit", "KRW", "BTC"), ("Binance", "USDT", "ETH")]))
     pprint(result1)
-
-    '''
-    results = ccxtcon.fetchConcurrently(ccxtcon.fetchOrderbook("Upbit", "KRW", "BTC"),
-                                        ccxtcon.fetchOrderbook("Binance", "USDT", "ETH"),
-                                        ccxtcon.fetchBalance("Bithumb", True))
-    pprint(results)
-    '''
