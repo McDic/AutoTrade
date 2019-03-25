@@ -29,7 +29,7 @@ class CryptoCompare(AbstractHTTPConnection):
         """
 
         # Parent class initialization
-        super().__init__(connectionName = "CryptoCompare data loader", key = {"api": api_key},
+        super().__init__(connectionName = "CryptoCompare data loader", keys= {"api": api_key},
                          baseURL = "https://min-api.cryptocompare.com",
                          callLimits = {"default": (60*60*24*31, 10**5)})
 

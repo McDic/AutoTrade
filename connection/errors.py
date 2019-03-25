@@ -15,13 +15,25 @@ class AutoTradeConnectionError(Exception):
     Abstract base of all connection's error.
     """
 
-class CallLimitExceededError(AutoTradeConnectionError):
+class CallRelatedError(AutoTradeConnectionError):
     """
-    <class CallLimitExceededError> inherited from AutoTradeConnectionError
+    <class CallRelatedError> inherited from AutoTradeConnectionError
+    Abstract base of all errors about internal rate limiting.
+    """
+
+class CallLimitExceededError(CallRelatedError):
+    """
+    <class CallLimitExceededError> inherited from CallRelatedError
     Used when connection's call limit exceeded.
     """
     def __init__(self, connectionName: str, fieldName: str):
         super().__init__("Connection [%s] call [%s] weight limit exceeded" % (connectionName, fieldName))
+
+class CallCancelled(CallRelatedError):
+    """
+    <class CallCancelled> inherited from CallRelatedError
+    Used when the call is cancelled by internal issue.
+    """
 
 class InvalidError(AutoTradeConnectionError):
     """
@@ -40,3 +52,9 @@ class MarketNotSupported(AutoTradeConnectionError):
 
 # ----------------------------------------------------------------------------------------------------------------------
 # __all__
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Testing
+
+if __name__ == "__main__":
+    pass

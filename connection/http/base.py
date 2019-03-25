@@ -24,18 +24,18 @@ class AbstractHTTPConnection(connection.base.AbstractConnection):
     """
 
     def __init__(self, connectionName: str, baseURL: str,
-                 callLimits = None, key = None, maxConcurrent = 8):
+                 callLimits = None, keys = None, maxConcurrent = 8):
         """
         <method AbstractHTTPConnection.__init__>
         :param connectionName:  The name of this connection.
         :param baseURL:         The base endpoint of target of this connection.
         :param callLimits:      Same argument as AbstractConnection.
-        :param key:             Same argument as AbstractConnection.
+        :param keys:             Same argument as AbstractConnection.
         :param maxConcurrent:   Maximum concurrent workers to send asynchronous HTTP request.
         """
 
         # Parent class initialization
-        super().__init__(connectionName, callLimits = callLimits, key = key)
+        super().__init__(connectionName, callLimits = callLimits, keys= keys)
 
         # Base URL set
         self.baseURL = baseURL
@@ -44,8 +44,7 @@ class AbstractHTTPConnection(connection.base.AbstractConnection):
         self.session = FuturesSession(max_workers = maxConcurrent)
         self.dataProcessID = 0 # Nonce value used to data process
 
-    def __str__(self):
-        return "Abstract HTTP Connection [%s]" % (self.name,)
+    def __str__(self): return "Abstract HTTP Connection [%s]" % (self.name,)
 
     def targetURL(self, endpoint: str):
         """
@@ -54,7 +53,6 @@ class AbstractHTTPConnection(connection.base.AbstractConnection):
         :param endpoint:
         :return: URL targeting to given endpoint
         """
-
         return self.baseURL + "/" + endpoint
 
     def request(self, mode: str, endpoint: str,

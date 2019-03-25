@@ -81,7 +81,7 @@ class CCXTConnection(AbstractConnection):
     async def closeExchangeSessions(self):
         """
         <async method CCXTConnection.closeExchangeSessions>
-        Close all exchange sessions asynchronously. At least Upbit exchange requires to close at the end of the program.
+        Close all exchange sessions asynchronously. CCXT.async_support requires to close at the end of the program.
         """
         tasks = []
         for exchangeName in self.exchanges:
@@ -89,18 +89,10 @@ class CCXTConnection(AbstractConnection):
         for task in tasks: await task
 
     def terminate(self):
-        """
-        <method CCXTConnection.terminate>
-        Terminate CCXTConnection.
-        """
         try:
             asyncio.get_event_loop().run_until_complete(self.closeExchangeSessions()) # Close exchange sessions
-        except: pass
-
-    # __enter__ is already prepared in parent class
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        super().__exit__(exc_type, exc_val, exc_tb)
-        self.terminate()
+        except:
+            pass
 
     # ------------------------------------------------------------------------------------------------------------------
     # Helper function
@@ -158,6 +150,7 @@ class CCXTConnection(AbstractConnection):
     # Fetching balances
 
     unnecessaryBalanceTags = ("free", "total", "used", "info")
+    @AbstractConnection._makeCall
     async def fetchBalance(self, exchangeName: str, removeZero: bool = False):
         """
         <async method CCXTConnection.fetchBalance>
