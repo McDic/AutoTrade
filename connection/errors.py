@@ -39,7 +39,18 @@ class InvalidError(AutoTradeConnectionError):
     """
     <class InvalidError> inherited from AutoTradeConnectionError
     Used when invalid argument or value is passed to connection's method.
-    But simple assertions can be raised by AssertionError, not this error.
+    """
+
+class InvalidTypeError(InvalidError, TypeError):
+    """
+    <class InvalidTypeError> inherited from InvalidError
+    Used when given value's type is invalid.
+    """
+
+class InvalidValueError(InvalidError, ValueError):
+    """
+    <class InvalidValueError> inherited from ValueError
+    Used when given value is invalid.
     """
 
 class MarketNotSupported(AutoTradeConnectionError):
