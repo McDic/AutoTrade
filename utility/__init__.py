@@ -9,35 +9,13 @@ This module provides integrated utilities.
 # Standard libraries
 import sys
 import time
+import typing
 
 # Custom libraries
 
 # ----------------------------------------------------------------------------------------------------------------------
-# TimeMeasure: Measure time to estimate performances
-class TimeMeasure:
-    """
-    <class TimeMeasure>
-    Used to measure time interval between checkpoints.
-    """
-
-    # Initializer
-    def __init__(self):
-        self.lastUpdatedTime = time.time()
-
-    # Update
-    def update(self, printing = False):
-        """
-        <method TimeMeasure.update>
-        Update checkpoints. If printing is True then print the debugged info.
-        :return: Time interval between last 2 checkpoints.
-        """
-        nowTime = time.time()
-        timeDiff = nowTime - self.lastUpdatedTime
-        self.lastUpdatedTime = nowTime
-        if printing:
-            # print("[DEBUG] ")
-            raise NotImplementedError
-        return timeDiff
+# Callable type definition
+callableType = typing.Callable[[typing.Any], typing.Any]
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Print framing
@@ -78,10 +56,37 @@ def printFrame(inputLines, initmsg: str = "", endmsg: str = "", totalsize: int =
     return lines
 
 # ----------------------------------------------------------------------------------------------------------------------
-# Analyzing: Analyze invocation of given function or method
-def analyze(method):
+# TimeMeasure: Measure time to estimate performances
+class TimeMeasure:
     """
-    <function analyze>
+    <class TimeMeasure>
+    Used to measure time interval between checkpoints.
+    """
+
+    # Initializer
+    def __init__(self):
+        self.lastUpdatedTime = time.time()
+
+    # Update
+    def update(self, printing = False):
+        """
+        <method TimeMeasure.update>
+        Update checkpoints. If printing is True then print the debugged info.
+        :return: Time interval between last 2 checkpoints.
+        """
+        nowTime = time.time()
+        timeDiff = nowTime - self.lastUpdatedTime
+        self.lastUpdatedTime = nowTime
+        if printing:
+            # print("[DEBUG] ")
+            raise NotImplementedError
+        return timeDiff
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Analyzing: Analyze invocation of given function or method
+def analyzer(method):
+    """
+    <function analyzer>
     Analyze and debug given arguments, execution time, result, etc.
     :return: Decorated method.
     """
@@ -91,25 +96,44 @@ def analyze(method):
         try: result = method(*args, **kwargs) # Try method call
         except BaseException as err: # If error occurred then print type of error and raise again.
             usedTime += time.time()
-            exc_type, exc_value, exc_traceback = sys.exc_info()
             debug_lines.append("Error %s occurred while performing (%.3f sec used)" % (type(err), usedTime))
-            printFrame(debug_lines, "Analyzing callable <%s>" % (method.__name__,))
+            printFrame(debug_lines, "Analyzing callable <%s>" % (method.__qualname__,))
             sys.stdout.flush() # For clean output, flush and wait minimum interval
             time.sleep(0.01)
-            raise err.with_traceback(exc_traceback)
+            raise err
         else: # If successfully executed then print result value and return.
             usedTime += time.time()
             debug_lines.append("Successfully executed, result is %s (%.3f sec used)" % (result, usedTime))
-            printFrame(debug_lines, "Analyzing callable <%s>" % (method.__name__,),)
+            printFrame(debug_lines, "Analyzing callable <%s>" % (method.__qualname__,),)
             return result
     return analyzed_method
+
+def analyze(method, *args, **kwargs):
+    """
+    <function analyze>
+    :return: Same as result of method(*args, **kwargs) but with analyzer.
+    """
+    return analyzer(method)(*args, **kwargs)
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Functionality testing
 
 if __name__ == "__main__":
 
-    @analyze
-    def divvv(a, b): return a / b
+    def test(a, b):
+        return a/b
+
+    @analyzer
+    def divvv(a, b): return test(a, b)
     print(divvv(1, 2))
-    print(divvv(1, b=0))
+    #print(divvv(1, b=0))
+
+    class testclass:
+        def __init__(self, num): self.num = num
+        @analyzer
+        def add(self, a, b): return a+b+self.num
+        def __str__(self): return "Testclass instance with number %f" % (self.num,)
+        __repr__ = __str__
+
+    testinstance = testclass(10)
+    testinstance.add(10, 5)
