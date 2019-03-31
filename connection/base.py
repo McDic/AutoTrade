@@ -17,6 +17,7 @@ from sys import exc_info
 
 # Custom libraries
 import connection.errors as cerr
+import utility
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Abstract base
@@ -56,7 +57,7 @@ class AbstractConnection:
         elif keys: raise cerr.InvalidError("Given keys is not valid (type %s)" % (type(keys),))
 
         # Register termination at exit
-        atexit.register(terminateSessionAtExit, args = (self,))
+        atexit.register(terminateSessionAtExit, self)
 
     def __str__(self): return "AbstractConnection [%s]" % (self.name,)
 
@@ -150,6 +151,35 @@ class AbstractConnection:
             self.refreshCallField(callFieldName)
         return thisCallLimit["current_weight"] + thisCallLimit["reserved_weight"] + weight <= thisCallLimit["max_weight"]
 
+    # ------------------------------------------------------------------------------------------------------------------
+    # Call related; Making call
+
+    __defaultCatching = frozenset([cerr.AutoTradeConnectionError])
+    __catching = tuple(__defaultCatching)
+    @staticmethod
+    def addExceptionsForToleration(*args):
+        """
+        <static method AbstractConnection.addExceptionsForToleration>
+        Add given exceptions for AbstractConnection.__catching.
+        """
+        for givenError in args:
+            if isinstance(givenError, Exception): # Given arguments should be consisted of Exceptions
+                if givenError not in AbstractConnection.__catching: # Append if only new exceptions are given
+                    AbstractConnection.__catching += (givenError,)
+            else: raise cerr.InvalidError("Invalid type %s given; Not inherited from Exception." % (givenError,))
+    @staticmethod
+    def removeExceptionsForToleration(*args):
+        """
+        <static method AbstractConnection.removeExceptionsForToleration>
+        Remove given exceptions for AbstractConnection.__catching.
+        """
+        newResult = []
+        for error in AbstractConnection.__catching:
+            if error in AbstractConnection.__defaultCatching:
+                raise cerr.InvalidError("Tried to remove default catching exception for AbstractConnection.__catching")
+            elif error not in args: newResult.append(error)
+        AbstractConnection.__catching = tuple(newResult)
+
     def _makeCall(method):
         """
         <static method AbstractConnection._makeCall> (It is not decorated by @staticmethod, but this method is static.)
@@ -179,7 +209,7 @@ class AbstractConnection:
             thisCallLimit = self.callLimits[callFieldName]
             thisCallLimit["reserved_weight"] += callWeight
             try: result = method(self, *args, **kwargs) # Main process
-            except cerr.AutoTradeConnectionError as err: # Cancelled calling so there is no new call history
+            except AbstractConnection.__catching as err: # Cancelled calling so there is no new call history
                 thisCallLimit["reserved_weight"] -= callWeight
                 raise err.with_traceback(exc_info()[2])
             except Exception as err: # Successfully called so put new call on history
