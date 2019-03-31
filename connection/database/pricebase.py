@@ -25,7 +25,7 @@ import connection.errors as cerr
 
 class PriceBase(AbstractConnection):
     """
-    <class PriceBase>
+    <class PriceBase> inherited from AbstractConnection
     Base database object to store price data(OHLCV and tick data).
 
     Keep in mind that this object don't support asynchronous querying yet.
