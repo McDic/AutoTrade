@@ -9,13 +9,9 @@ This module provides integrated utilities.
 # Standard libraries
 import sys
 import time
-import typing
+import asyncio
 
 # Custom libraries
-
-# ----------------------------------------------------------------------------------------------------------------------
-# Callable type definition
-callableType = typing.Callable[[typing.Any], typing.Any]
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Print framing
@@ -114,6 +110,26 @@ def analyze(method, *args, **kwargs):
     :return: Same as result of method(*args, **kwargs) but with analyzer.
     """
     return analyzer(method)(*args, **kwargs)
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Async related
+def concurrentResults(*coroutines, timeout = None):
+    """
+    <function concurrentResults>
+    Run all given coroutines concurrently until all tasks are finished and return the result.
+    Raised errors are tolerated and treated as result.
+    :param coroutines: List of coroutines.
+    :param timeout: Maximum timeout in seconds. None for infinite timeout.
+    :return: List of result of coroutines.
+    """
+    eventLoop = asyncio.get_event_loop()
+    tasks = [eventLoop.create_task(coro) for coro in coroutines]
+    results = []
+    assert timeout is None or (isinstance(timeout, (int, float)) and timeout > 0)
+    for task in tasks:
+        try: results.append(eventLoop.run_until_complete(asyncio.wait_for(task, timeout = timeout)))
+        except Exception as err: results.append(err)
+    return results
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Functionality testing
