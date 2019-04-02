@@ -9,10 +9,10 @@ Quantitative Analysis Toolkit.
         - requests-futures: Asynchronous HTTP requests
     - selenium: Powerful raw crawling
         - beautifulsoup4: HTML parser
-    - psycopg2: PostgreSQL Python binder
+    - ~~psycopg2~~ asyncpg: Asynchronous PostgreSQL Python binder
     - pony: Excellent ORM for database
     - ccxt: Cryptocurrency exchanges binder
-    - *(UNUSED) boto3: AWS SDK for Python 3*
+    - ~~boto3: AWS SDK for Python 3~~
     
 - PostgreSQL 10+
     - pgadmin 4: GUI for PostgreSQL
