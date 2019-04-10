@@ -10,49 +10,42 @@ Abstract base of all database connection.
 from copy import deepcopy
 from decimal import Decimal
 from datetime import datetime, timedelta
-import atexit
+import asyncio
 
 # External libraries
-import psycopg2
-from psycopg2.sql import SQL, Identifier, Literal # Advanced querying
+import asyncpg
 
 # Custom libraries
-from connection.base import AbstractConnection
+from .base import AbstractPGDBConnectionClass
 import connection.errors as cerr
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Pricebase
 
-class PriceBase(AbstractConnection):
+class PriceBase(AbstractPGDBConnectionClass):
     """
-    <class PriceBase> inherited from AbstractConnection
-    Base database object to store price data(OHLCV and tick data).
+    <class PriceBase> inherited from AbstractPGDBConnectionClass
+    Base asynchronous database template to store price data(OHLCV and tick data).
 
-    Keep in mind that this object don't support asynchronous querying yet.
-    Multithreading is possible, but since psycopg2 only supports revoking transaction at connection-object level, I don't recommend it.
-
-    All query-related method should contain 'exchange', 'base', 'quote', 'minuteInterval' as first 4 arguments.
+    All query-related method should contain 'exchange', 'base', 'quote', 'minuteInterval'.
+    Minute interval is positive number, -1 for exception of tick data.
     Those are decorated by validity checking method.
     """
 
     defaultDBname = "PriceBase"
-    defaultPortNumber = 5432 # Default port number for PostgreSQL
-    baseMinuteIntervals = {1,} # Base minute intervals to handle
+    baseMinuteIntervals = {1, } # Base minute intervals to handle
 
     # ------------------------------------------------------------------------------------------------------------------
-    # Constructors
+    # Constructors / Initializing
 
-    def __init__(self, username: str, password: str, dbname: str = defaultDBname,
-                 host: str = "localhost", port: int = defaultPortNumber,
-                 additionalMarkets: dict = None, callLimits: dict = None):
+    def __init__(self, userName: str, password: str, DBname: str = defaultDBname,
+                 host: str = AbstractPGDBConnectionClass.defaultHost,
+                 port: int = AbstractPGDBConnectionClass.defaultPortNumber,
+                 connectionName: str = None, additionalMarkets: dict = None, callLimits: dict = None):
 
         # Parent class initialization; Key is not given to parent class because it's handled by db connection
-        super().__init__(connectionName = "PostgreSQL %s/%s Connection" % (dbname, username), callLimits = callLimits)
-
-        # Create DB connection
-        self.connection = psycopg2.connect(user = username, password = password, dbname = dbname,
-                                           host = host, port = port)
-        del username, password
+        super().__init__(userName, password, DBname, host = host, port = port,
+                         connectionName = connectionName, callLimits = callLimits)
 
         # Migrate markets
         self.markets = {}
@@ -66,56 +59,76 @@ class PriceBase(AbstractConnection):
                         for minuteInterval in additionalMarkets[exchange][base][quote]:
                             self.markets[exchange][base][quote].add(minuteInterval)
 
-        # Search already existing markets and add in self.markets
-        with self.connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT table_name
-                FROM information_schema.tables
-                WHERE table_schema = 'public'
-                AND table_type = 'BASE TABLE';""")
-            for result in cursor:
-                tablename = result[0]
-                if tablename.startswith("PriceData_"): # Syntax should be PRICEDATA_(EXCHANGE)_(BASE)_(QUOTE)_((aggregate)mins | tick)
-                    _, exchange, base, quote, minuteInterval = [c.strip(" ") for c in tablename.split("_")]
-                    if minuteInterval == "tick": minuteInterval = 0
+    async def __init__async__(self, userName: str, password: str, DBname: str = defaultDBname,
+                              host: str = AbstractPGDBConnectionClass.defaultHost,
+                              port: int = AbstractPGDBConnectionClass.defaultPortNumber):
+        """
+        <async method PriceBaseSync.__init__async__>
+        Initialize for async things.
+        """
+
+        # Parent class initialization
+        await super()._init_async(host, port, userName, password, DBname)
+        del password
+
+
+    async def refreshMarketTables(self, additionalMarkets: dict = None):
+        """
+        <async method PriceBase.refreshMarketTables>
+        Refresh market tables from current database table names and additional markets information.
+        :param additionalMarkets: Additional markets information to add.
+        """
+        async with self.connection.transaction():
+
+            # Fetch table names
+            tableNames = [record[0] for record in await self.connection.fetch("""
+                        SELECT table_name FROM information_schema.tables
+                        WHERE table_schema = 'public' AND table_type = 'BASE TABLE';""")]
+
+            # Add information to self.markets from fetched table names
+            for tableName in tableNames:
+                if tableName.startswith("PriceData_"): # Syntax should be PriceData_<EXCHANGE>_<BASE>_<QUOTE>_<AGG>mins or _tick
+                    _, exchange, base, quote, minuteInterval = [c.strip(" ") for c in tableName.split("_")]
+                    if minuteInterval == "tick": minuteInterval = -1
                     else: minuteInterval = int(minuteInterval.replace("mins", ""))
-                    if minuteInterval < 0: raise cerr.InvalidError("Negative minute interval(%d) found" % (minuteInterval,))
                     if exchange not in self.markets: self.markets[exchange] = {}
                     if base not in self.markets[exchange]: self.markets[exchange][base] = {}
-                    if quote not in self.markets[exchange][base]: self.markets[exchange][base][quote] = deepcopy(PriceBase.baseMinuteIntervals)
+                    if quote not in self.markets[exchange][base]:
+                        self.markets[exchange][base][quote] = deepcopy(PriceBase.baseMinuteIntervals)
                     self.markets[exchange][base][quote].add(minuteInterval)
 
-        # Create tables
-        self.addMarketTables()
+            # Add information to self.markets from additionalMarkets
 
     # ------------------------------------------------------------------------------------------------------------------
     # Termination
 
     def terminate(self):
-        super().terminate()
-        if not self.connection.closed: self.connection.close()
+        raise NotImplementedError
 
     # ------------------------------------------------------------------------------------------------------------------
-    # Helper
+    # Helper functions
 
     @staticmethod
     def tableName(exchange: str, base: str, quote: str, minuteInterval: (int, timedelta)) -> str:
         """
-        <method PriceBase.tableName> (static method)
+        <method PriceBaseSync.tableName> (static method)
         This method doesn't check if given market is supported or not. So be careful with usage.
         If given minuteInterval is zero, then tick data table name will be returned.
         :return: Table name generated from given exchange, base, quote, and minute interval.
         """
-        if minuteInterval == 0: return "PriceData_%s_%s_%s_tick" % (exchange, base, quote)
-        elif isinstance(minuteInterval, int) and minuteInterval > 0:
-            return "PriceData_%s_%s_%s_%dmins" % (exchange, base, quote, minuteInterval)
-        elif isinstance(minuteInterval, timedelta) and minuteInterval.total_seconds() % 60 == 0:
-            return "PriceData_%s_%s_%s_%dmins" % (exchange, base, quote, minuteInterval.total_seconds() // 60)
+        if minuteInterval in (-1, "tick"): return "PriceData_%s_%s_%s_tick" % (exchange, base, quote)
+        elif isinstance(minuteInterval, int):
+            if minuteInterval > 0: return "PriceData_%s_%s_%s_%dmins" % (exchange, base, quote, minuteInterval)
+            else: raise cerr.InvalidValueError("Non positive minute interval(%d minutes) given" % (minuteInterval,))
+        elif isinstance(minuteInterval, timedelta):
+            if minuteInterval.microseconds == 0 and minuteInterval.seconds == 0:
+                return "PriceData_%s_%s_%s_%dmins" % (exchange, base, quote, minuteInterval.days * 86400)
+            else: raise cerr.InvalidValueError("Given interval has extra seconds(%s)" % (minuteInterval,))
         else: raise cerr.InvalidError("Invalid minute interval(%s) given" % (minuteInterval,))
 
     def availableIntervals(self, exchange: str, base: str, quote: str) -> set:
         """
-        <method PriceBase.availableIntervals>
+        <method PriceBaseSync.availableIntervals>
         :return: Set of available intervals from currently supporting markets. Empty set for non-existing market.
         """
         try: return self.markets[exchange][base][quote]
@@ -123,7 +136,7 @@ class PriceBase(AbstractConnection):
 
     def raiseIfNotSupported(self, exchange, base, quote, minuteInterval):
         """
-        <method PriceBase.raiseIfNotSupported>
+        <method PriceBaseSync.raiseIfNotSupported>
         Raise error if given minute interval is not supported for given market.
         """
         if minuteInterval not in self.availableIntervals(exchange, base, quote):
@@ -131,40 +144,39 @@ class PriceBase(AbstractConnection):
 
     def addMarketTables(self):
         """
-        <method PriceBase.addMarketTables>
+        <method PriceBaseSync.addMarketTables>
         Add database tables for currently supporting markets.
         """
-        with self.connection.cursor() as cursor:
-            for exchange in self.markets:
-                for base in self.markets[exchange]:
-                    for quote in self.markets[exchange][base]:
-                        for minuteInterval in self.markets[exchange][base][quote]:
+        for exchange in self.markets:
+            for base in self.markets[exchange]:
+                for quote in self.markets[exchange][base]:
+                    for minuteInterval in self.markets[exchange][base][quote]:
+
+                        # Create table
+                        tableName = self.tableName(exchange, base, quote, minuteInterval)
+                        async with self.connection.transaction():
 
                             # Tick
-                            if minuteInterval == 0: cursor.execute(SQL("""
-                                CREATE TABLE IF NOT EXISTS {} (
+                            if minuteInterval in (-1, "tick"): self.connection.execute("""
+                                CREATE TABLE IF NOT EXISTS """ + tableName + """ (
                                 timestamp TIMESTAMPTZ PRIMARY KEY,
                                 price NUMERIC(24, 8) NOT NULL,
                                 volume NUMERIC(24, 8) NOT NULL,
-                                CHECK(volume > 0),
-                                CHECK(timestamp <= NOW())
-                            );""").format(Identifier(PriceBase.tableName(exchange, base, quote, 0))))
+                                CHECK(volume > 0), CHECK(timestamp <= NOW())
+                            );""")
 
                             # OHLCV
-                            else: cursor.execute(SQL("""
-                                CREATE TABLE IF NOT EXISTS {0} (
+                            else: self.connection.execute("""
+                                CREATE TABLE IF NOT EXISTS """ + tableName + """ (
                                 timestamp TIMESTAMPTZ PRIMARY KEY,
                                 open NUMERIC(24, 8) NOT NULL,
                                 high NUMERIC(24, 8) NOT NULL,
                                 low NUMERIC(24, 8) NOT NULL,
                                 close NUMERIC(24, 8) NOT NULL,
                                 volume NUMERIC(24, 8) NOT NULL,
-                                CHECK(volume > 0), 
-                                CHECK(timestamp <= NOW()),
-                                CHECK(CAST(ROUND(EXTRACT(epoch from timestamp)) AS BIGINT) % {1} == 0)
-                            );""").format(Identifier(PriceBase.tableName(exchange, base, quote, minuteInterval)),
-                                          Literal(60 * minuteInterval)))
-        self.connection.commit()
+                                CHECK(volume > 0), CHECK(timestamp <= NOW()),
+                                CHECK(CAST(ROUND(EXTRACT(epoch from timestamp)) AS BIGINT) % $1 == 0)
+                            );""", minuteInterval * 60)
 
     # ------------------------------------------------------------------------------------------------------------------
     # Grant privileges
@@ -196,7 +208,7 @@ class PriceBase(AbstractConnection):
 
     def getSingleOHLCV(self, exchange: str, base: str, quote: str, minuteInterval: (int, timedelta), timestamp: datetime):
         """
-        <method PriceBase.getSingleOHLCV>
+        <method PriceBaseSync.getSingleOHLCV>
         :return: OHLCV with given market and timestamp. If no data found, return None instead.
         """
 
@@ -226,7 +238,7 @@ class PriceBase(AbstractConnection):
     def getMultiOHLCV(self, exchange: str, base: str, quote: str, minuteInterval: int,
                       startTime: datetime, endTime = datetime):
         """
-        <method PriceBase.getBetweenTimestamps>
+        <method PriceBaseSync.getBetweenTimestamps>
         :return: Dict of OHLCVs with given market and timestamp. {timestamp: (O, H, L, C, V), ...}
         """
 
@@ -253,7 +265,7 @@ class PriceBase(AbstractConnection):
                        O: Decimal, H: Decimal, L: Decimal, C: Decimal, V: Decimal,
                        override: bool = True, showDetailedProgress: bool = False) -> bool:
         """
-        <method PriceBase.addSingleOHLCV>
+        <method PriceBaseSync.addSingleOHLCV>
         Insert or update single (timestamp, O, H, L, C, V) into database.
         :return: If the operation was successful
         """
@@ -283,7 +295,7 @@ class PriceBase(AbstractConnection):
             return True
         except psycopg2.Error as err: # If error occured then rollback
             if showDetailedProgress:
-                print("psycopg2.Error <%s> raised while inserting single row in PriceBase.addSingleOHLCV (query = %s)" %
+                print("psycopg2.Error <%s> raised while inserting single row in PriceBaseSync.addSingleOHLCV (query = %s)" %
                       (err, str(cursor.query)))
             self.connection.rollback()
             return False
@@ -292,7 +304,7 @@ class PriceBase(AbstractConnection):
                       separate: str = ",", tempTableName: str = "PriceDataTemp",
                       override: bool = True, showDetailedProgress: bool = True) -> bool:
         """
-        <method PriceBase.fastCopyOHLCV>
+        <method PriceBaseSync.fastCopyOHLCV>
         Fast bulk insertion using COPY query with given file. The given file should matches like csv, described below:
             <timestamp> <sep> <open> <sep> <high> <sep> <low> <sep> <close> <sep> <volume> [\n ... (repeat)]
         :return: If the query was successful.
@@ -349,8 +361,8 @@ def openFromFile(filepath, markets = None):
         <password>
         <host> (if host is blank then set to 'localhost')
         <port> (if port is blank then set to 5432)
-        <dbname> (if dbname is blank then set to default value (PriceBase.defaultDBname))
-    :return: PriceBase object
+        <dbname> (if dbname is blank then set to default value (PriceBaseSync.defaultDBname))
+    :return: PriceBaseSync object
     """
     with open(filepath) as file:
         username, password, host, port, dbname = [c.strip(' ') for c in file.read().split("\n")]
