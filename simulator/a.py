@@ -3,7 +3,8 @@ import os
 
 from PyQt5.QtCore import Qt, QDateTime
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMenu, QVBoxLayout, \
-    QSizePolicy, QMessageBox, QWidget, QPushButton, QHBoxLayout, QLabel, QDateTimeEdit
+    QSizePolicy, QMessageBox, QWidget, QPushButton, QHBoxLayout, QLabel, QDateTimeEdit, \
+    QComboBox, QTextEdit
 from PyQt5.QtGui import QIcon
 
 
@@ -12,18 +13,17 @@ import matplotlib.pyplot as plt
 
 import random
 
+
 class App(QWidget):
     def __init__(self):
+
         super().__init__()
-        self.initUI()
-
-        self.setLayout(self.layout)
-        self.setGeometry(200, 200, 800, 400)
-
-    def initUI(self):
 
         self.drawButton = QPushButton("DRAW Graph")
         self.drawButton.clicked.connect(self.btnDrawClicked)
+
+        self.randomDrawButton = QPushButton("DRAW Random Graph")
+        self.randomDrawButton.clicked.connect(self.btnRandomDrawClicked)
 
         self.clearButton = QPushButton("Clear Graph")
         self.clearButton.clicked.connect(self.btnClearClicked)
@@ -43,33 +43,68 @@ class App(QWidget):
 
         # Starting timestamp controller
         startingLayout = QHBoxLayout()
-        startingLayout.addWidget(QLabel('Start'))
+        startingLayout.addWidget(QLabel('Starts at'))
         startingLayout.addWidget(self.startingDateTimeEdit)
 
         # Ending timestamp controller
         endingLayout = QHBoxLayout()
-        endingLayout.addWidget(QLabel('End'))
+        endingLayout.addWidget(QLabel('Ends at'))
         endingLayout.addWidget(self.endingDateTimeEdit)
 
-        # controller Layout
+        # Selector
+        itemList = ['USD', 'BTC', 'ETH']
+        selectorLayout = QHBoxLayout()
+
+        # Base selector
+        self.baseSelector = QComboBox()
+        selectorLayout.addWidget(QLabel('Base'))
+        self.baseSelector.addItems(itemList)
+        selectorLayout.addWidget(self.baseSelector)
+
+        # Target selector
+        self.targetSelector = QComboBox()
+        selectorLayout.addWidget(QLabel('Target'))
+        self.targetSelector.addItems(itemList)
+        selectorLayout.addWidget(self.targetSelector)
+
+        # Text edit
+        self.textEdit = QTextEdit()
+        self.textEdit.setAcceptRichText(False)
+
+        # Controller Layout
         controlLayout = QVBoxLayout()
         controlLayout.addLayout(startingLayout)
         controlLayout.addLayout(endingLayout)
-        controlLayout.addWidget(self.drawButton)
+        controlLayout.addLayout(selectorLayout)
+        controlLayout.addWidget(self.textEdit)
         controlLayout.addStretch(1)
+        controlLayout.addWidget(self.randomDrawButton)
+        controlLayout.addWidget(self.drawButton)
         controlLayout.addWidget(self.clearButton)
-        controlLayout.addStretch(10)
 
         self.layout = QHBoxLayout()
         self.layout.addLayout(plotLayout)
         self.layout.addLayout(controlLayout)
 
-        self.ax = self.fig.add_subplot(1,1,1)
+        self.ax = self.fig.add_subplot(1, 1, 1)
         self.ax.grid(True)
 
+        self.setLayout(self.layout)
+        self.setGeometry(200, 200, 1000, 600)
 
     def btnDrawClicked(self):
-        QMessageBox.about(self,'Hi','start : {}'.format(self.startingDateTimeEdit.dateTime().toTime_t()))
+        startingTimeStamp = self.startingDateTimeEdit.dateTime().toTime_t()
+        endingTimeStamp = self.endingDateTimeEdit.dateTime().toTime_t()
+        baseCurrency = self.baseSelector.currentText()
+        targetCurrency = self.targetSelector.currentText()
+        textEditContent = self.textEdit.toPlainText()
+
+        text = f'start {startingTimeStamp}\nend {endingTimeStamp}\nbase {baseCurrency}\ntarget {targetCurrency}\n' + \
+            f'textEdit {textEditContent}'
+
+        QMessageBox.about(self, 'Hi', text)
+
+    def btnRandomDrawClicked(self):
         self.ax.grid(True)
         xx = list(range(100))
         yy = list(range(100))
@@ -78,14 +113,13 @@ class App(QWidget):
         self.canvas.draw()
 
     def btnClearClicked(self):
-        print('aa')
         self.ax.cla()
+        self.ax.grid(True)
         self.canvas.draw()
 
 
-
 if __name__ == '__main__':
-    #For Hidpi support
+    # For High dpi support
     os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
     app = QApplication(sys.argv)
     app.setAttribute(Qt.AA_EnableHighDpiScaling)
