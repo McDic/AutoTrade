@@ -33,7 +33,7 @@ class Simulator:
         self.name = name
         self.figure, self.axes = plt.subplots(2, 1)
 
-        x = np.arange(1, 10, 1)
+        x = np.linspace(1,10,200)
         y = np.sin(x)
         self.axes[0].plot(x, y, 'ko', x, y, 'b')
         self.axes[0].set_ylabel("sin")
