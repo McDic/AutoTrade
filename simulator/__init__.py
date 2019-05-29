@@ -88,7 +88,6 @@ class Simulator:
         """
         self.priceDB = priceBase
 
-<<<<<<< HEAD
     def simulateTick(self, tickLambda: typing.Callable[[typing.Any], float],
                      baseCurrency: str, quoteCurrency: str, exchange: str,
                      startTimestamp: datetime, endTimestamp: datetime,
@@ -102,16 +101,7 @@ class Simulator:
         :param fakeAccount:
         :return:
         """
-=======
-        x = np.linspace(1,10,200)
-        y = np.sin(x)
-        self.axes[0].plot(x, y, 'ko', x, y, 'b')
-        self.axes[0].set_ylabel("sin")
-        self.axes[1].plot(x, y**2)
-        self.axes[1].set_ylabel("sin^2")
-        plt.show()
->>>>>>> 6a3a4001e4825582aa804f2c21dd8b850ff125af
-
+        
         # Validation
         if startTimestamp > endTimestamp:
             raise PastAccessError("Start timestamp(%s) is later than End timestamp(%s)" % (startTimestamp, endTimestamp))
