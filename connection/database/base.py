@@ -7,7 +7,6 @@ Abstract base of all database connection.
 # Libraries
 
 # Standard libraries
-import re
 import asyncio
 
 # External libraries
@@ -66,7 +65,7 @@ class AbstractPGDBConnectionClass(AbstractConnection):
     # ------------------------------------------------------------------------------------------------------------------
     # Representation
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "Abstract PostgreSQL %s Connection [%s]: Connected to %s@%s:%d/%s (PID = %d)" % \
                (self.serverVersion, self.name, self.username, self.host, self.port, self.DBname, self.PID)
     __repr__ = __str__
@@ -75,7 +74,7 @@ class AbstractPGDBConnectionClass(AbstractConnection):
     # Query: Helpers and light queries
 
     @staticmethod
-    def _isCorrectSign(sign: str):
+    def _isCorrectSign(sign: str) -> bool:
         """
         <method AbstractPGDBConnectionClass._isCorrectSign>
         :return: If given sign is correct or not.
@@ -85,10 +84,9 @@ class AbstractPGDBConnectionClass(AbstractConnection):
             else: return True
         return False
 
-    defaultNameSign = "{T}"
-    defaultVarNameSign = "{vT}"
+    defaultNameSign, defaultVarNameSign = "{T}", "{vT}"
     @staticmethod
-    def RN(query: str, *names, nameSign: str = defaultNameSign, varNameSign: str = defaultVarNameSign):
+    def RN(query: str, *names, nameSign: str = defaultNameSign, varNameSign: str = defaultVarNameSign) -> str:
         """
         <static method AbstractPGDBConnectionClass.RN>
         RN = Replace part by names
@@ -106,7 +104,7 @@ class AbstractPGDBConnectionClass(AbstractConnection):
             raise cerr.InvalidValueError("'%' is in varNameSign")
         return query.replace("%", "%%").replace(nameSign, "\"%s\"").replace(varNameSign, "'\"%s\"'") % names
 
-    async def getColumns(self, tableName: str):
+    async def getColumns(self, tableName: str) -> list:
         """
         <async method AbstractPGDBConnectionClass.getColumns>
         Return all column names for given table name.
@@ -117,7 +115,7 @@ class AbstractPGDBConnectionClass(AbstractConnection):
                 "SELECT column_name FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = $1", tableName)
         return [row[0] for row in columnNames]
 
-    async def getPrimaryKeys(self, tableName: str):
+    async def getPrimaryKeys(self, tableName: str) -> list:
         """
         <async method AbstractPGDBConnectionClass.getPrimaryKeys>
         Return all primary key names for given table name.
@@ -136,7 +134,7 @@ class AbstractPGDBConnectionClass(AbstractConnection):
     # Query: Generic and heavy queries
 
     async def execute(self, query: str, tableNames: tuple = (), *args,
-                      toleratedExceptions: tuple = (), timeout: float = None,
+                      toleratedExceptions: tuple = (), timeout: float = None, fetch: bool = False,
                       tableSign: str = defaultNameSign, varTableSign: str = defaultVarNameSign):
         """
         <async method AbstractPGDBConnectionClass.execute>
@@ -146,15 +144,18 @@ class AbstractPGDBConnectionClass(AbstractConnection):
         :param toleratedExceptions: List of tolerated exceptions.
             If one of the exception in toleratedExceptions raised, it's tolerated.
         :param timeout: Timeout used in 'self.connection.execute'.
-        :return: The given query was successful or not.
-            This doesn't implies that your query was executed in your intend.
+        :return: If fetch is True, return if the given query was executed or not. Otherwise, return fetched result.
         """
         query = self.RN(query, *tableNames, nameSign= tableSign, varNameSign= varTableSign)
-        print("Will try query: %s" % (query,))
-        async with self.connection.transaction(): # Transaction or savepoint begin
-            try: await self.connection.execute(query, *args, timeout = timeout)
-            except toleratedExceptions: return False
-            else: return True
+        # print("Will try query: %s / args: %s" % (query, args))
+        try:
+            async with self.connection.transaction():  # Transaction or savepoint begin
+                if not fetch: await self.connection.execute(query, *args, timeout = timeout)
+                else: return await self.connection.fetch(query, *args, timeout = timeout)
+        except toleratedExceptions: return False
+        else:
+            if not fetch: return True
+            else: return None
 
     async def pushFile(self, fileName, tableName, columns: tuple = None, timeout: float = None,
                        delimiter = ",", override: bool = True):
@@ -179,7 +180,7 @@ class AbstractPGDBConnectionClass(AbstractConnection):
         async with self.connection.transaction():
 
             # Step 1: Create temporary table with very rare name, it's dropped after commit.
-            tempTableName = "_temp_table_name_that_used_in_AbstractPDGBConnection_"
+            tempTableName = "_temp_table_name_that_used_in_AbstractPGDBConnection_"
             await self.execute("CREATE TEMPORARY TABLE {T} (LIKE {T}) ON COMMIT DROP",
                                (tempTableName, tableName), timeout = timeout)
 
@@ -230,7 +231,7 @@ class AbstractPGDBConnectionClass(AbstractConnection):
                 (" WITH GRANT OPTION" if withGrantOption else "")
         await self.execute(query)
 
-    async def grantDatabase(self, ): pass
+    async def grantDatabase(self, ): raise NotImplementedError
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Exceptions
@@ -252,7 +253,7 @@ class InvalidQueryError(AbstractPGDBError, asyncpg.exceptions.QueryCanceledError
 async def AbstractPGDBConnection(userName: str = None, password: str = None, DBname: str = None,
                                  host: str = AbstractPGDBConnectionClass.defaultHost,
                                  port: int = AbstractPGDBConnectionClass.defaultPortNumber,
-                                 fileName: str = None, **kwargs):
+                                 fileName: str = None, **kwargs) -> AbstractPGDBConnectionClass:
     """
     <function AbstractPGDBConnection>
     Construct and return Abstract PostgreSQL Connection asynchronously.
@@ -273,17 +274,15 @@ async def AbstractPGDBConnection(userName: str = None, password: str = None, DBn
 if __name__ == "__main__":
 
     from pprint import pprint
-    import random
     print(AbstractPGDBConnectionClass.__doc__)
 
     async def run():
 
         PGDB = await AbstractPGDBConnection(fileName = "awsdb.authkey")
-        await PGDB.grantTable("ALL", userName = "m43ng")
 
     async def run_m43ng():
 
         PGDB = await AbstractPGDBConnection(fileName = "awsdb_m43ng.authkey")
         pprint(await PGDB.connection.fetch("SELECT * FROM \"PriceData_Bitfinex_USD_BTC_1mins\" LIMIT 100"))
 
-    asyncio.get_event_loop().run_until_complete(run_m43ng())
+    asyncio.get_event_loop().run_until_complete(run())

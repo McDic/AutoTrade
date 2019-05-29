@@ -43,13 +43,13 @@ class InvalidError(AutoTradeConnectionError):
 
 class InvalidTypeError(InvalidError, TypeError):
     """
-    <class InvalidTypeError> inherited from InvalidError
+    <class InvalidTypeError> inherited from InvalidError, TypeError
     Used when given value's type is invalid.
     """
 
 class InvalidValueError(InvalidError, ValueError):
     """
-    <class InvalidValueError> inherited from ValueError
+    <class InvalidValueError> inherited from InvalidError, ValueError
     Used when given value is invalid.
     """
 
@@ -68,4 +68,5 @@ class MarketNotSupported(AutoTradeConnectionError):
 # Testing
 
 if __name__ == "__main__":
-    pass
+
+    print(InvalidValueError.__doc__)

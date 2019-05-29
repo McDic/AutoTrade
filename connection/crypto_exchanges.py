@@ -17,7 +17,7 @@ import ccxt.async_support as ccxt
 
 # Custom libraries
 from connection.base import AbstractConnection
-import connection.errors
+import connection.errors as cerr
 
 # ----------------------------------------------------------------------------------------------------------------------
 # CCXT binder
@@ -111,14 +111,14 @@ class CCXTConnection(AbstractConnection):
         raise Exception if given market is not supported.
         """
         if not self.isSupported(exchange, base, quote):
-            raise connection.errors.MarketNotSupported(exchange, base, quote)
+            raise cerr.MarketNotSupported(exchange, base, quote)
 
     @staticmethod
     def makeDecimal(value):
         if value is None: return Decimal(0)
         elif isinstance(value, Decimal): return value.quantize(Decimal("0.1") ** 8)
         elif isinstance(value, (int, float, str)): return Decimal(value).quantize(Decimal("0.1") ** 8)
-        else: raise connection.errors.InvalidError("Invalid type(%s) given in CCXTConnection.makeDecimal" % (type(value),))
+        else: raise cerr.InvalidError("Invalid type(%s) given in CCXTConnection.makeDecimal" % (type(value),))
 
     # ------------------------------------------------------------------------------------------------------------------
     # Fetching markets
@@ -150,7 +150,7 @@ class CCXTConnection(AbstractConnection):
     # Fetching balances
 
     unnecessaryBalanceTags = ("free", "total", "used", "info")
-    @AbstractConnection._makeCall
+    #@AbstractConnection._makeCallSync
     async def fetchBalance(self, exchangeName: str, removeZero: bool = False):
         """
         <async method CCXTConnection.fetchBalance>
@@ -238,7 +238,7 @@ class CCXTConnection(AbstractConnection):
         for exchangeName, base, quote in targets:
             if exchangeName not in tasks: tasks[exchangeName] = {}
             if base not in tasks[exchangeName]: tasks[exchangeName][base] = {}
-            if quote in tasks[exchangeName][base]: raise connection.errors.InvalidError("Duplicated markets")
+            if quote in tasks[exchangeName][base]: raise cerr.InvalidError("Duplicated markets")
             tasks[exchangeName][base][quote] = asyncio.create_task(
                 self.fetchOrderbook(exchangeName, base, quote, processReversed = processReversed))
 
@@ -265,7 +265,7 @@ class CCXTConnection(AbstractConnection):
                 return await self.exchanges[exchangeName].fetchOpenOrders(symbol="%s/%s" % (quote, base))
             elif self.isSupported(exchangeName, quote, base) and processReversed: # Fetch open orders in reversed market
                 return await self.fetchOpenOrders(exchangeName, quote, base, processReversed = True)
-            else: raise connection.MarketNotSupported(exchangeName, base, quote) # Given market not found
+            else: raise cerr.MarketNotSupported(exchangeName, base, quote) # Given market not found
         else: return await self.exchanges[exchangeName].fetchOpenOrders()
 
     async def createOrder(self, exchangeName: str, base: str, quote: str,
@@ -279,13 +279,13 @@ class CCXTConnection(AbstractConnection):
         """
 
         # Zero price error
-        if price == 0: raise connection.InvalidError("Cannot create orders with zero price")
+        if price == 0: raise cerr.InvalidError("Cannot create orders with zero price")
 
         # If given market is not supported then try to find reversed pair
         if not self.isSupported(exchangeName, base, quote):
             if self.isSupported(exchangeName, quote, base):
                 return await self.createOrder(exchangeName, quote, base, price ** -1, price*amount, buy = not buy)
-            else: raise connection.MarketNotSupported(exchangeName, base, quote)
+            else: raise cerr.MarketNotSupported(exchangeName, base, quote)
 
         # Create order and return order ID
         result = await self.exchanges[exchangeName].createOrder(

@@ -22,6 +22,10 @@ import utility
 # ----------------------------------------------------------------------------------------------------------------------
 # Abstract base
 
+# All exceptions are default to catch in call rate limiter
+_defaultCatching = frozenset([cerr.AutoTradeConnectionError,])
+
+# ABC for Connection
 class AbstractConnection:
     """
     <class AbstractConnection>
@@ -31,35 +35,30 @@ class AbstractConnection:
     # ------------------------------------------------------------------------------------------------------------------
     # Base methods
 
-    def __init__(self, connectionName: str = "AbstractConnection", callLimits: dict = None, keys: dict = None):
+    def __init__(self, connectionName: str = None, callLimits: dict = None):
         """
         <method AbstractConnection.__init__>
         :param connectionName:  Name of this connection.
         :param callLimits:      Define call limits. Syntax: {Field name: (Refreshing time interval(sec), Max weight)}
-        :param keys:            Define keys(passwords) to authenticate.
         """
 
         # Basic attributes
-        self.name = connectionName
+        self.name = connectionName if connectionName else "Unnamed_Connection_0x%X" % (id(self),)
         self.callLimits = {} # {field name: (refreshing time interval(sec), max weight)}
-        self.key = {} # {name: value (string)}
 
-        # Adding call limits
+        # Call limits
+        self.__catching_set = set(_defaultCatching) # Set of catching exceptions
+        self.__catching_tuple = tuple(_defaultCatching) # Tuple of catching exceptions
         if isinstance(callLimits, dict):
             for callFieldName in callLimits:
                 timeInterval, maxWeight = callLimits[callFieldName]
                 self.addCallField(callFieldName, timeInterval, maxWeight)
         elif callLimits: raise cerr.InvalidError("Given call limits is not valid (type %s)" % (type(callLimits),))
 
-        # Adding keys
-        if isinstance(keys, dict):
-            for name in keys: self.key[name] = str(keys[name])
-        elif keys: raise cerr.InvalidError("Given keys is not valid (type %s)" % (type(keys),))
-
         # Register termination at exit
         atexit.register(terminateSessionAtExit, self)
 
-    def __str__(self): return "AbstractConnection [%s]" % (self.name,)
+    def __str__(self): return "Abstract Connection [%s]" % (self.name,)
 
     # ------------------------------------------------------------------------------------------------------------------
     # Supporting with clause
@@ -154,41 +153,47 @@ class AbstractConnection:
     # ------------------------------------------------------------------------------------------------------------------
     # Call related; Making call
 
-    __defaultCatching = frozenset([cerr.AutoTradeConnectionError])
-    __catching = tuple(__defaultCatching)
-    @staticmethod
-    def addExceptionsForToleration(*args):
+    def addExceptionsForToleration(self, *args):
         """
         <static method AbstractConnection.addExceptionsForToleration>
-        Add given exceptions for AbstractConnection.__catching.
+        Add given exceptions for AbstractConnection.__catching_tuple.
+        All given exceptions are already in __catching_set / __catching_tuple will be ignored.
         """
         for givenError in args:
-            if isinstance(givenError, Exception): # Given arguments should be consisted of Exceptions
-                if givenError not in AbstractConnection.__catching: # Append if only new exceptions are given
-                    AbstractConnection.__catching += (givenError,)
-            else: raise cerr.InvalidError("Invalid type %s given; Not inherited from Exception." % (givenError,))
-    @staticmethod
-    def removeExceptionsForToleration(*args):
+            if not isinstance(givenError, Exception): # Non-exception given
+                self.__catching_tuple = tuple(self.__catching_set)
+                raise cerr.InvalidError("Invalid type %s given; Not inherited from Exception." % (type(givenError),))
+            elif givenError not in self.__catching_set:  # Append if only new exceptions are given
+                self.__catching_set.add(givenError)
+        self.__catching_tuple = tuple(self.__catching_set)
+
+    def removeExceptionsForToleration(self, *args):
         """
         <static method AbstractConnection.removeExceptionsForToleration>
-        Remove given exceptions for AbstractConnection.__catching.
+        Remove given exceptions for AbstractConnection.__catching_tuple.
+        All given exceptions are not in __catching_set / __catching_tuple will be ignored.
         """
-        newResult = []
-        for error in AbstractConnection.__catching:
-            if error in AbstractConnection.__defaultCatching:
-                raise cerr.InvalidError("Tried to remove default catching exception for AbstractConnection.__catching")
-            elif error not in args: newResult.append(error)
-        AbstractConnection.__catching = tuple(newResult)
+        for givenError in args:
+            if not isinstance(givenError, Exception): # Non-exception given
+                self.__catching_tuple = tuple(self.__catching_set)
+                raise cerr.InvalidTypeError("Invalid type %s given; Not inherited from Exception." % (type(givenError),))
+            elif givenError in _defaultCatching: # Tried to remove default catching exception
+                self.__catching_tuple = tuple(self.__catching_set)
+                raise cerr.InvalidError("Tried to remove default-catching Exceptions")
+            elif givenError in self.__catching_set: # Remove only if already exist
+                self.__catching_set.remove(givenError)
+        self.__catching_tuple = tuple(self.__catching_set)
 
-    def _makeCall(method):
+    def _makeCallSync(method):
         """
-        <static method AbstractConnection._makeCall> (It is not decorated by @staticmethod, but this method is static.)
+        <static method AbstractConnection._makeCallSync>
         Reserve the call weight before process.
         Given method should have 'callFieldName' and 'callWeight' in kwargs, otherwise the call will not affect by any limit field.
-        To make call, just add @AbstractConnection._makeCall for method.
+        To make call, just add @AbstractConnection._makeCallSync for method.
+        Note that this function is not decorated by @staticmethod, but this method is static.
         :return: Decorated method.
         """
-        def decorated(self, *args, **kwargs):
+        def decorated(self: AbstractConnection, *args, **kwargs):
 
             # If parameter is not given
             if "callFieldName" not in kwargs: raise cerr.InvalidError("Call field name is not given")
@@ -209,7 +214,7 @@ class AbstractConnection:
             thisCallLimit = self.callLimits[callFieldName]
             thisCallLimit["reserved_weight"] += callWeight
             try: result = method(self, *args, **kwargs) # Main process
-            except AbstractConnection.__catching as err: # Cancelled calling so there is no new call history
+            except self.__catching_tuple as err: # Cancelled calling so there is no new call history
                 thisCallLimit["reserved_weight"] -= callWeight
                 raise err.with_traceback(exc_info()[2])
             except Exception as err: # Successfully called so put new call on history
@@ -222,7 +227,49 @@ class AbstractConnection:
                 thisCallLimit["current_weight"] += callWeight
                 thisCallLimit["reserved_weight"] -= callWeight
                 return result
+        return decorated
 
+    def _makeCallAsync(method):
+        """
+        <static method AbstractConnection._makeCallAsync>
+        Do same thing as AbstractConnection._makeCallSync, but this method is for coroutine.
+        Note that this function is not decorated by @staticmethod, but this method is static.
+        :return: Decorated coroutine.
+        """
+        async def decorated(self, *args, **kwargs):
+
+            # If parameter is not given
+            if "callFieldName" not in kwargs: raise cerr.InvalidError("Call field name is not given")
+            elif "callWeight" not in kwargs: kwargs["callWeight"] = 0 # If weight is not given then it's considered as 0
+
+            # Attributes
+            callFieldName = kwargs["callFieldName"]
+            callWeight = kwargs["callWeight"]
+
+            # Edge case control
+            if not self.isPossibleCall(callFieldName, callWeight): # Internal rate limiting: Call limit exceeded.
+                raise cerr.CallLimitExceededError(self.name, callFieldName)
+            elif not callFieldName or callWeight == 0: # Always possible call don't need any additional processes.
+                return await method(self, *args, **kwargs)
+
+            # Reserve weight, process, post-process, finally return or raise.
+            # Concept of reserved weight is from handling concurrency.
+            thisCallLimit = self.callLimits[callFieldName]
+            thisCallLimit["reserved_weight"] += callWeight
+            try: result = method(self, *args, **kwargs) # Main process
+            except self.__catching_tuple as err: # Cancelled calling so there is no new call history
+                thisCallLimit["reserved_weight"] -= callWeight
+                raise err.with_traceback(exc_info()[2])
+            except Exception as err: # Successfully called so put new call on history
+                thisCallLimit["history"].put((datetime.now(), callWeight))
+                thisCallLimit["current_weight"] += callWeight
+                thisCallLimit["reserved_weight"] -= callWeight
+                raise err.with_traceback(exc_info()[2])
+            else: # Process completed
+                thisCallLimit["history"].put((datetime.now(), callWeight))
+                thisCallLimit["current_weight"] += callWeight
+                thisCallLimit["reserved_weight"] -= callWeight
+                return result
         return decorated
 
 # ----------------------------------------------------------------------------------------------------------------------

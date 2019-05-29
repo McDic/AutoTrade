@@ -11,6 +11,8 @@ import sys
 import time
 import asyncio
 
+# External libraries
+
 # Custom libraries
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -73,9 +75,7 @@ class TimeMeasure:
         nowTime = time.time()
         timeDiff = nowTime - self.lastUpdatedTime
         self.lastUpdatedTime = nowTime
-        if printing:
-            # print("[DEBUG] ")
-            raise NotImplementedError
+        if printing: raise NotImplementedError
         return timeDiff
 
 # ----------------------------------------------------------------------------------------------------------------------

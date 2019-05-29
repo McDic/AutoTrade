@@ -176,7 +176,7 @@ class PriceBaseSync(AbstractConnection):
         if privilege not in ("SELECT", "INSERT", "UPDATE", "DELETE", "RULE", "ALL"):
             raise cerr.InvalidError("Given privilege(%s) is invalid" % (privilege,))
 
-        try: # Try grant query
+        try: # Try grantTable query
             with self.connection.cursor() as cursor:
                 for exchange in self.markets:
                     for base in self.markets[exchange]:
@@ -188,7 +188,7 @@ class PriceBaseSync(AbstractConnection):
                                 else: cursor.execute(SQL("REVOKE %s ON {0} FROM {1}" % (privilege,)).format(*IDtuple))
             self.connection.commit()
         except psycopg2.Error as err: # If error occurred then cancel everything
-            print("Error (%s) occured while doing grant query <%s>" % (err, str(cursor.query)))
+            print("Error (%s) occured while doing grantTable query <%s>" % (err, str(cursor.query)))
             self.connection.rollback()
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -366,6 +366,20 @@ def openFromFile(filepath, markets = None):
 if __name__ == "__main__":
     PDB = openFromFile("awsdb.authkey")
 
+    with PDB.connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+            AND table_type = 'BASE TABLE';""")
+        tablenames = [result[0] for result in cursor]
+        for tablename in tablenames:
+            print(tablename)
+            if not tablename.endswith("_1mins"):
+                query = SQL("DROP TABLE {0}").format(Identifier(tablename))
+                cursor.execute(query)
+    PDB.connection.commit()
+
     # Get data test
     '''
     data = PDB.getBetweenTimestamps("Bitflyer", "USD", "BTC", 1, datetime.min, datetime.max)
@@ -374,9 +388,6 @@ if __name__ == "__main__":
         o, h, l, c, v = data[timestamp]
        print("%s -> %s / %s / %s / %s / %s" % (timestamp, o, h, l, c, v))
     '''
-
-    # Grant test
-    PDB.grant("ALL", "mcdic", True)
 
     # CSV copyfile format test
     '''
