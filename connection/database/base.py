@@ -282,7 +282,7 @@ if __name__ == "__main__":
 
     async def run_m43ng():
 
-        PGDB = await AbstractPGDBConnection(fileName = "awsdb_m43ng.authkey")
+        PGDB = await AbstractPGDBConnection(fileName = "awsdb.authkey")
         pprint(await PGDB.connection.fetch("SELECT * FROM \"PriceData_Bitfinex_USD_BTC_1mins\" LIMIT 100"))
 
     asyncio.get_event_loop().run_until_complete(run())
