@@ -84,8 +84,8 @@ class NaiveSimulator:
                 nowSold = True
 
             # Result appending
-            #result[currentTime] = (formulaValue, nowBought, nowSold, currentMoney)
-            result[currentTime] = (formulaValue, shouldBuy, shouldSell, currentMoney)
+            result[currentTime] = (formulaValue, nowBought, nowSold, currentMoney)
+            #result[currentTime] = (formulaValue, shouldBuy, shouldSell, currentMoney)
             currentTime += quantumTime
 
         # Return
