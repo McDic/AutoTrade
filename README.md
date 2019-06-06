@@ -81,4 +81,5 @@ else:
                                     if smallf(timestamp, i) in price_data)
     if smallf(timestamp, 0) not in price_data: return recentAverage, False, False
     nowPrice = price_data[smallf(timestamp, 0)][criteria]
-    return recentAverage, recentAverage > nowPrice, recentAverage < nowPrice```
+    return recentAverage, recentAverage > nowPrice, recentAverage < nowPrice
+ ```
