@@ -3,14 +3,8 @@
 
 # Standard libraries
 import asyncio
-import statistics
-from pprint import pprint
-import typing
-from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 import sys
 import os
-import random
 
 from PyQt5.QtCore import Qt, QDateTime
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMenu, QVBoxLayout, \
@@ -97,8 +91,10 @@ class App(QWidget):
         controlLayout.addLayout(endingLayout)
         controlLayout.addLayout(selectorLayout)
         controlLayout.addLayout(exchangeLayout)
-        controlLayout.addWidget(self.textEdit)
         controlLayout.addStretch(1)
+        controlLayout.addWidget(QLabel('def formula(timestamp: datetime, price_data: dict, criteria=3):'))
+        controlLayout.addWidget(self.textEdit)
+        controlLayout.addStretch(100)
         controlLayout.addWidget(self.drawButton)
         controlLayout.addWidget(self.clearButton)
 
@@ -127,24 +123,46 @@ class App(QWidget):
         baseCurrency = self.baseSelector.currentText()
         targetCurrency = self.targetSelector.currentText()
         exchange = self.exchangeSelector.currentText()
-        # textEditContent = self.textEdit.toPlainText()
+        textEditContent = self.textEdit.toPlainText()
 
-        # text = f'start {startingTimeStamp}\nend {endingTimeStamp}\nbase {baseCurrency}\ntarget {targetCurrency}\n' + \
-        #     f'exchange {exchange}\ntextEdit {textEditContent}'
+        ####################################################################################################
+        # Textedit Text example
+        ####################################################################################################
+        # def smallf(timestamp: datetime, i: int):
+        #     return round((timestamp - i * timedelta(minutes=1)).timestamp())
+        #
+        # if len(price_data) < 5:
+        #     return None, False, False
+        # else:
+        #     recentAverage = statistics.mean(price_data[smallf(timestamp, i)][criteria] for i in range(50)
+        #                                     if smallf(timestamp, i) in price_data)
+        #     if smallf(timestamp, 0) not in price_data: return recentAverage, False, False
+        #     nowPrice = price_data[smallf(timestamp, 0)][criteria]
+        #     return recentAverage, recentAverage > nowPrice, recentAverage < nowPrice
 
-        def formula(timestamp: datetime, price_data: dict, criteria=3):
-            if len(price_data) < 5:
-                return None, False, False
-            else:
-                recentAverage = statistics.mean(price_data[smallf(timestamp, i)][criteria] for i in range(50)
-                                                if smallf(timestamp, i) in price_data)
-                if smallf(timestamp, 0) not in price_data: return recentAverage, False, False
-                nowPrice = price_data[smallf(timestamp, 0)][criteria]
-                return recentAverage, recentAverage > nowPrice, recentAverage < nowPrice
+        textEditContent = textEditContent.replace('\t','    ')
+        textEditContent = textEditContent.split('\n')
+        textEditContent = ['    ' + line for line in textEditContent]
+        textEditContent = '\n'.join(textEditContent)
+        textEditContent = 'def formula(timestamp, price_data, criteria=3):\n' + textEditContent + '\n\n'
+
+        d = {}
+        exec('import datetime\nfrom datetime import timedelta\nimport statistics',d)
+        exec(textEditContent,d)
+
+        # def formula(timestamp: datetime, price_data: dict, criteria=3):
+        #     if len(price_data) < 5:
+        #         return None, False, False
+        #     else:
+        #         recentAverage = statistics.mean(price_data[smallf(timestamp, i)][criteria] for i in range(50)
+        #                                         if smallf(timestamp, i) in price_data)
+        #         if smallf(timestamp, 0) not in price_data: return recentAverage, False, False
+        #         nowPrice = price_data[smallf(timestamp, 0)][criteria]
+        #         return recentAverage, recentAverage > nowPrice, recentAverage < nowPrice
 
 
         result = asyncio.get_event_loop().run_until_complete(
-            NSR.simulate(formula, baseCurrency, targetCurrency, exchange, startingTimeStamp, endingTimeStamp))
+            NSR.simulate(d['formula'], baseCurrency, targetCurrency, exchange, startingTimeStamp, endingTimeStamp))
 
         result = self.convertDecimalToFloat(result)
 
@@ -183,15 +201,6 @@ if __name__ == '__main__':
     DB = asyncio.get_event_loop().run_until_complete(PriceBase(fileName="awsdb.authkey"))
     NSR = NaiveSimulator(DB)
 
-
-
-
-
-    # result = {datetime(2016,1,2):(1,0,0,1),
-    #           datetime(2016,1,3):(3,0,0,2),
-    #           datetime(2016,1,4):(2,0,0,3),
-    #           datetime(2016,1,5):(5,0,0,4),
-    #           datetime(2016,1,6):(4,0,0,5),}
     # For High dpi support
     os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
     app = QApplication(sys.argv)

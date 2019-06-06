@@ -70,3 +70,15 @@ Using PostgreSQL DB from localhost or AWS.
     - volume: Trading volume of the period, using same type as open.
         This column has additional constraint `CHECK(volume > 0)`.
         This means there is no data for periods with no trading volume.
+        
+ * Example function
+ ```
+ def smallf(timestamp: datetime, i: int): return round((timestamp - i * timedelta(minutes = 1)).timestamp())
+if len(price_data) < 5:
+    return None, False, False
+else:
+    recentAverage = statistics.mean(price_data[smallf(timestamp, i)][criteria] for i in range(50)
+                                    if smallf(timestamp, i) in price_data)
+    if smallf(timestamp, 0) not in price_data: return recentAverage, False, False
+    nowPrice = price_data[smallf(timestamp, 0)][criteria]
+    return recentAverage, recentAverage > nowPrice, recentAverage < nowPrice```
