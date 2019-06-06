@@ -101,7 +101,7 @@ class Simulator:
         :param fakeAccount:
         :return:
         """
-        
+
         # Validation
         if startTimestamp > endTimestamp:
             raise PastAccessError("Start timestamp(%s) is later than End timestamp(%s)" % (startTimestamp, endTimestamp))

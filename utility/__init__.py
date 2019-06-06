@@ -10,6 +10,7 @@ This module provides integrated utilities.
 import sys
 import time
 import asyncio
+from datetime import datetime
 
 # External libraries
 
@@ -132,24 +133,33 @@ def concurrentResults(*coroutines, timeout = None):
     return results
 
 # ----------------------------------------------------------------------------------------------------------------------
+# Timestamp container
+
+class TimestampContainer(dict):
+    """
+    <class TimestampContainer> inherited from dict
+    """
+
+    def __getitem__(self, key: datetime):
+        if isinstance(key, datetime): return super().__getitem__(round(key.timestamp()))
+        else: raise TypeError("Key should be instance of datetime")
+    def __setitem__(self, key: datetime, value):
+        if isinstance(key, datetime): return super().__setitem__(round(key.timestamp()), value)
+        else: raise TypeError("Key should be instance of datetime")
+    def __delitem__(self, key: datetime):
+        if isinstance(key, datetime): return super().__delitem__(round(key.timestamp()))
+        else: raise TypeError("Key should be instance of datetime")
+
+# ----------------------------------------------------------------------------------------------------------------------
 # Functionality testing
 
 if __name__ == "__main__":
 
-    def test(a, b):
-        return a/b
+    a = TimestampContainer()
+    a[datetime(2019, 5, 30, 10, 0, 0)] = 1
+    a[datetime(2019, 5, 29, 6, 40, 0)] = 2
+    for key in range(a):
+        print("key = %d" % (key,))
+        val = a[key]
+        print("Object[%s] = %s" % (key, val))
 
-    @analyzer
-    def divvv(a, b): return test(a, b)
-    print(divvv(1, 2))
-    #print(divvv(1, b=0))
-
-    class testclass:
-        def __init__(self, num): self.num = num
-        @analyzer
-        def add(self, a, b): return a+b+self.num
-        def __str__(self): return "Testclass instance with number %f" % (self.num,)
-        __repr__ = __str__
-
-    testinstance = testclass(10)
-    testinstance.add(10, 5)
