@@ -5,11 +5,12 @@
 import asyncio
 import sys
 import os
+import datetime
 
-from PyQt5.QtCore import Qt, QDateTime
+from PyQt5.QtCore import Qt, QDateTime, QDate
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMenu, QVBoxLayout, \
     QSizePolicy, QMessageBox, QWidget, QPushButton, QHBoxLayout, QLabel, QDateTimeEdit, \
-    QComboBox, QTextEdit
+    QComboBox, QTextEdit, QErrorMessage
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
@@ -38,10 +39,14 @@ class App(QWidget):
         self.canvas = FigureCanvas(self.fig)
 
         self.startingDateTimeEdit = QDateTimeEdit(self)
-        self.startingDateTimeEdit.setDateTime(QDateTime.currentDateTime())
+        curDateTime = datetime.date.today()
+        curDateTime = curDateTime.replace(year=2016)
+        qDateTime = QDateTime.currentDateTime()
+        qDateTime.setDate(curDateTime)
+        self.startingDateTimeEdit.setDateTime(qDateTime)
 
         self.endingDateTimeEdit = QDateTimeEdit(self)
-        self.endingDateTimeEdit.setDateTime(QDateTime.currentDateTime())
+        self.endingDateTimeEdit.setDateTime(qDateTime)
 
         # plotting part layout
         plotLayout = QVBoxLayout()
@@ -148,7 +153,11 @@ class App(QWidget):
 
         d = {}
         exec('import datetime\nfrom datetime import timedelta\nimport statistics',d)
-        exec(textEditContent,d)
+        try:
+            exec(textEditContent,d)
+        except Exception as e:
+            QMessageBox.about(self, 'Error', str(e))
+            return
 
         # def formula(timestamp: datetime, price_data: dict, criteria=3):
         #     if len(price_data) < 5:
@@ -160,9 +169,12 @@ class App(QWidget):
         #         nowPrice = price_data[smallf(timestamp, 0)][criteria]
         #         return recentAverage, recentAverage > nowPrice, recentAverage < nowPrice
 
-
-        result = asyncio.get_event_loop().run_until_complete(
-            NSR.simulate(d['formula'], baseCurrency, targetCurrency, exchange, startingTimeStamp, endingTimeStamp))
+        try:
+            result = asyncio.get_event_loop().run_until_complete(
+                NSR.simulate(d['formula'], baseCurrency, targetCurrency, exchange, startingTimeStamp, endingTimeStamp))
+        except Exception as e:
+            QMessageBox.about(self, 'Error', str(e))
+            return
 
         result = self.convertDecimalToFloat(result)
 

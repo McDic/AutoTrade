@@ -73,7 +73,7 @@ Using PostgreSQL DB from localhost or AWS.
         
  * Example function
  ```
- def smallf(timestamp: datetime, i: int): return round((timestamp - i * timedelta(minutes = 1)).timestamp())
+def smallf(timestamp: datetime, i: int): return round((timestamp - i * timedelta(minutes = 1)).timestamp())
 if len(price_data) < 5:
     return None, False, False
 else:
