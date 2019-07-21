@@ -274,12 +274,12 @@ class CCXTConnection(AbstractConnection):
         <async method CCXTConnection.order>
         Create order based on given exchange, base, quote.
         If base and quote are reversed, then automatically reverse it and process all related values(amount, price, etc)
-        Price is described by [1 quote = price base], and the unit of amount is quote.
+        Price is described by [1 quote = $price base], and the unit of amount is quote.
         :return: Order ID.
         """
 
-        # Zero price error
-        if price == 0: raise cerr.InvalidError("Cannot create orders with zero price")
+        # Non positive price error
+        if price <= 0: raise cerr.InvalidError("Cannot create orders with non-positive(%s) price" % (price,))
 
         # If given market is not supported then try to find reversed pair
         if not self.isSupported(exchangeName, base, quote):
@@ -317,7 +317,7 @@ from pprint import pprint
 if __name__ == "__main__":
 
     ccxtcon = CCXTConnection.makeFromFile(
-        Upbit = "upbit.authkey", Binance = "binance.authkey", Bithumb = "bithumb_jo.authkey")
+        Upbit = "upbit.authkey")
 
     #pprint(ccxtcon.markets["Upbit"])
     #pprint(ccxtcon.markets["Binance"])
@@ -328,5 +328,5 @@ if __name__ == "__main__":
     #print("%.2f seconds used" % tm.update())
 
     result1 = asyncio.get_event_loop().run_until_complete(
-        ccxtcon.fetchOrderbooks([("Upbit", "KRW", "BTC"), ("Binance", "USDT", "ETH")]))
+        ccxtcon.fetchOrderbook("Upbit", "KRW", "BTC"))
     pprint(result1)
