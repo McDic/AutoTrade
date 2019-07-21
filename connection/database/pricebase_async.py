@@ -1,6 +1,6 @@
 """
-<module AutoTrade.database.pricebase>
-Abstract base of all database connection.
+<module AutoTrade.database.pricebase_async>
+Abstract base of all async database connection.
 """
 
 # ----------------------------------------------------------------------------------------------------------------------

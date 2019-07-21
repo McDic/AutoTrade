@@ -1,5 +1,5 @@
 """
-<module AutoTrade.database.pricebase>
+<module AutoTrade.database.pricebase_sync> (Deprecated)
 Abstract base of all database connection.
 """
 
