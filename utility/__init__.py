@@ -140,26 +140,47 @@ class TimestampContainer(dict):
     <class TimestampContainer> inherited from dict
     """
 
+    @staticmethod
+    def validateTimestamp(timestamp: datetime):
+        raise NotImplementedError
+
     def __getitem__(self, key: datetime):
-        if isinstance(key, datetime): return super().__getitem__(round(key.timestamp()))
-        else: raise TypeError("Key should be instance of datetime")
+        if isinstance(key, int): return super().__getitem__(key)
+        elif isinstance(key, datetime): return super().__getitem__(round(key.timestamp()))
+        else: raise TypeError("Key should be instance of int or datetime")
     def __setitem__(self, key: datetime, value):
-        if isinstance(key, datetime): return super().__setitem__(round(key.timestamp()), value)
-        else: raise TypeError("Key should be instance of datetime")
+        if isinstance(key, int): return super().__setitem__(key, value)
+        elif isinstance(key, datetime): return super().__setitem__(round(key.timestamp()), value)
+        else: raise TypeError("Key should be instance of jnt or datetime")
     def __delitem__(self, key: datetime):
-        if isinstance(key, datetime): return super().__delitem__(round(key.timestamp()))
-        else: raise TypeError("Key should be instance of datetime")
+        if isinstance(key, int): return super().__delitem__(key)
+        elif isinstance(key, datetime): return super().__delitem__(round(key.timestamp()))
+        else: raise TypeError("Key should be instance of int or datetime")
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Functionality testing
 
 if __name__ == "__main__":
 
+    import pytz
+
+    utc = pytz.timezone("UTC")
+    utc20190530 = datetime(2019, 5, 30, 10, 0, 0, tzinfo = utc)
+    print(utc20190530.timestamp())
+    myzone = datetime(2019, 5, 30, 19, 0, 0)
+    print(myzone.timestamp())
+    print(utc20190530 == myzone)
+
     a = TimestampContainer()
     a[datetime(2019, 5, 30, 10, 0, 0)] = 1
     a[datetime(2019, 5, 29, 6, 40, 0)] = 2
-    for key in range(a):
-        print("key = %d" % (key,))
+    for key in a:
+        key2 = datetime.fromtimestamp(key)
+        key3 = datetime.utcfromtimestamp(key)
+        print("key = %d, %s (local), %s (UTC)" % (key, key2, key3))
+        print("Timestamp %d (local) vs %d (UTC)" % (key2.timestamp(), key3.timestamp()))
         val = a[key]
-        print("Object[%s] = %s" % (key, val))
-
+        val2 = a[key2]
+        print("Object[%s] = %s (int), %s (local)" % (key, val, val2))
+        print(str(key2 == key3))
+        print("")
