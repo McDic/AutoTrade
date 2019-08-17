@@ -169,7 +169,7 @@ class CCXTConnection(AbstractConnection):
             if removeZero and allZero: del result[currency] # Remove empty balances
         return result
 
-    async def fetchBalances(self, exchangeNames = ()):
+    async def fetchBalances(self, *exchangeNames):
         """
         <async method CCXTConnection.fetchBalances>
         Fetch account balances for given exchange names. Zero balance will be removed.
@@ -255,6 +255,21 @@ class CCXTConnection(AbstractConnection):
     # ------------------------------------------------------------------------------------------------------------------
     # Order
 
+    async def fetchOrder(self, exchangeName: str, orderID: str, clean: bool = False):
+        """
+        <async method CCXTConnection.fetchOrder>
+        :param exchangeName: Name of exchange.
+        :param orderID: Order ID.
+        :return: Given order's status.
+        """
+        result = await self.exchanges[exchangeName].fetchOrder(orderID)
+        if clean:
+            mandatoryArguments = {"amount", "average", "cost", "datetime", "fee", "id", "side", "status", "symbol"}
+            for argument in list(result):
+                if argument not in mandatoryArguments:
+                    del result[argument]
+        return result
+
     async def fetchOpenOrders(self, exchangeName: str, base: str = "", quote: str = "", processReversed: bool = False):
         """
         <async method CCXTConnection.fetchOpenOrders>
@@ -269,7 +284,8 @@ class CCXTConnection(AbstractConnection):
         else: return await self.exchanges[exchangeName].fetchOpenOrders()
 
     async def createOrder(self, exchangeName: str, base: str, quote: str,
-                          price: (int, float, Decimal), amount: (int, float, Decimal), buy: bool = True):
+                          price: (int, float, Decimal), amount: (int, float, Decimal), buy: bool = True,
+                          processReversed: bool = True):
         """
         <async method CCXTConnection.order>
         Create order based on given exchange, base, quote.
@@ -283,7 +299,7 @@ class CCXTConnection(AbstractConnection):
 
         # If given market is not supported then try to find reversed pair
         if not self.isSupported(exchangeName, base, quote):
-            if self.isSupported(exchangeName, quote, base):
+            if self.isSupported(exchangeName, quote, base) and processReversed:
                 return await self.createOrder(exchangeName, quote, base, price ** -1, price*amount, buy = not buy)
             else: raise cerr.MarketNotSupported(exchangeName, base, quote)
 
@@ -291,7 +307,7 @@ class CCXTConnection(AbstractConnection):
         result = await self.exchanges[exchangeName].createOrder(
             "%s/%s" % (quote, base), "limit", "buy" if buy else "sell", amount, price)
         orderID = result["id"]
-        self.marketByOrderID[exchangeName, orderID] = (base, quote)
+        # self.marketByOrderID[exchangeName, orderID] = (base, quote)
         return orderID
 
     async def cancelOrder(self, exchangeName: str, orderID: str, explicitBase: str = None, explicitQuote: str = None):
@@ -317,7 +333,7 @@ from pprint import pprint
 if __name__ == "__main__":
 
     ccxtcon = CCXTConnection.makeFromFile(
-        Upbit = "upbit.authkey")
+        Upbit = "upbit_jo.authkey")
 
     #pprint(ccxtcon.markets["Upbit"])
     #pprint(ccxtcon.markets["Binance"])
@@ -327,6 +343,22 @@ if __name__ == "__main__":
     #pprint(asyncio.get_event_loop().run_until_complete(ccxtcon.fetchOrderbooks([("Upbit", "KRW", "BTC")])))
     #print("%.2f seconds used" % tm.update())
 
+    asyncio.get_event_loop().run_until_complete(ccxtcon.fetchBalances("Upbit"))
+    pprint(ccxtcon.balance)
+
     result1 = asyncio.get_event_loop().run_until_complete(
-        ccxtcon.fetchOrderbook("Upbit", "KRW", "BTC"))
+        ccxtcon.fetchOrder("Upbit", "1c8deba8-27fe-4ebb-9a68-71005bf6fe75", clean = True))
     pprint(result1)
+    print("\n==================================================")
+    result2 = asyncio.get_event_loop().run_until_complete(
+        ccxtcon.fetchOrder("Upbit", "0ac1bcdb-a3c6-44e0-a329-55aeb61b6a25", clean = True))
+    pprint(result2)
+    print("\n==================================================")
+    result3 = asyncio.get_event_loop().run_until_complete(
+        ccxtcon.fetchOrder("Upbit", "83f9e3b2-9087-4ea2-8c77-1791c5729b4d", clean = True))
+    pprint(result3)
+    print("\n==================================================")
+
+
+    #result1 = asyncio.get_event_loop().run_until_complete(ccxtcon.fetchOrderbook("Upbit", "KRW", "BTC"))
+    #pprint(result1)
