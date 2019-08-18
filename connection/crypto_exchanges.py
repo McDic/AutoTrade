@@ -116,8 +116,8 @@ class CCXTConnection(AbstractConnection):
     @staticmethod
     def makeDecimal(value):
         if value is None: return Decimal(0)
-        elif isinstance(value, Decimal): return value.quantize(Decimal("0.1") ** 8)
-        elif isinstance(value, (int, float, str)): return Decimal(value).quantize(Decimal("0.1") ** 8)
+        elif isinstance(value, Decimal): return value.quantize(Decimal("0.1") ** 20)
+        elif isinstance(value, (int, float, str)): return Decimal(value).quantize(Decimal("0.1") ** 20)
         else: raise cerr.InvalidError("Invalid type(%s) given in CCXTConnection.makeDecimal" % (type(value),))
 
     # ------------------------------------------------------------------------------------------------------------------
